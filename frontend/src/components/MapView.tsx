@@ -170,7 +170,7 @@ const findNearestPointOnEdge = (
   if (!geom) return null
 
   let minDistance = Infinity
-  let bestProj: [number, number] = geom[0]
+  let bestProj: [number, number] = geom[0] as [number, number]
   let bestSegIndex = 0
 
   for (let i = 0; i < geom.length - 1; i++) {
@@ -909,7 +909,7 @@ const EditPathForm = ({ edge, fromNodeName, toNodeName, onSave, onDelete, onCanc
           onClick={handleDelete}
           className="px-2.5 py-1 text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded font-medium transition-colors"
         >
-          Delete
+          Delete Path
         </button>
         <div className="flex space-x-2">
           <button
@@ -935,14 +935,23 @@ interface SnapActionFormProps {
   snap: SnapProjection
   fromNodeName: string
   toNodeName: string
-  onConnect: () => void
+  onMerge: () => void
+  onJunction: () => void
   onContinueSeparate: () => void
   onCancel: () => void
 }
 
-const SnapActionForm = ({ snap, fromNodeName, toNodeName, onConnect, onContinueSeparate, onCancel }: SnapActionFormProps) => {
+const SnapActionForm = ({
+  snap,
+  fromNodeName,
+  toNodeName,
+  onMerge,
+  onJunction,
+  onContinueSeparate,
+  onCancel,
+}: SnapActionFormProps) => {
   return (
-    <div className="p-1 min-w-[260px] space-y-2.5 text-slate-900 font-sans">
+    <div className="p-1 min-w-[270px] space-y-2.5 text-slate-900 font-sans">
       <div className="font-bold text-sm text-indigo-900 border-b border-slate-200 pb-1 flex items-center justify-between">
         <span>Path Intersection Detected</span>
         <span className="text-[10px] bg-sky-100 text-sky-800 font-semibold px-1.5 py-0.5 rounded">
@@ -951,20 +960,34 @@ const SnapActionForm = ({ snap, fromNodeName, toNodeName, onConnect, onContinueS
       </div>
 
       <p className="text-xs text-slate-600">
-        This path intersects or comes close to an existing path (<strong>{fromNodeName} ➔ {toNodeName}</strong>).
+        Near path: <strong>{fromNodeName} ➔ {toNodeName}</strong>. Choose action:
       </p>
 
       <div className="space-y-1.5 pt-1">
         <button
           type="button"
-          onClick={onConnect}
+          onClick={onMerge}
           className="w-full text-left px-3 py-2 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg font-semibold transition-colors flex items-start space-x-2 shadow-sm"
         >
           <span className="text-base leading-none">🟢</span>
           <div>
-            <div>Connect to Existing Path</div>
+            <div>Merge With Existing Path</div>
             <div className="text-[10px] font-normal text-emerald-700 mt-0.5">
-              Split path & join graph at snapped point (reuses or creates Navigation node)
+              Extend road as one continuous path (no node / no split)
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={onJunction}
+          className="w-full text-left px-3 py-2 text-xs bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg font-semibold transition-colors flex items-start space-x-2 shadow-sm"
+        >
+          <span className="text-base leading-none">🔵</span>
+          <div>
+            <div>Create Junction</div>
+            <div className="text-[10px] font-normal text-blue-700 mt-0.5">
+              Insert/reuse Navigation node & split road into intersection
             </div>
           </div>
         </button>
@@ -978,7 +1001,7 @@ const SnapActionForm = ({ snap, fromNodeName, toNodeName, onConnect, onContinueS
           <div>
             <div>Continue Drawing as Separate Path</div>
             <div className="text-[10px] font-normal text-slate-500 mt-0.5">
-              Cross over without graph connection (overpass, skywalk, tunnel, corridor)
+              Cross over without graph connection (bridge, skywalk, tunnel)
             </div>
           </div>
         </button>
@@ -1077,6 +1100,31 @@ export const MapView = () => {
     }
   }, [edges])
 
+  // Global Keyboard shortcuts: ESC to cancel drawing, Backspace / Ctrl+Z to undo last waypoint
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isPathMode) return
+
+      const targetTag = (e.target as HTMLElement)?.tagName?.toUpperCase()
+      if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') {
+        return
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        resetPathDrawingState()
+      } else if (e.key === 'Backspace' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')) {
+        if (drawingWaypoints.length > 0) {
+          e.preventDefault()
+          setDrawingWaypoints((prev) => prev.slice(0, -1))
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isPathMode, drawingWaypoints.length])
+
   const resetPathDrawingState = () => {
     setDrawStep('select_start')
     setSelectedStartNode(null)
@@ -1122,7 +1170,6 @@ export const MapView = () => {
     } else if (isPathMode) {
       if (drawStep === 'drawing_waypoints') {
         if (hoveredSnap) {
-          // Open snapping dialog option menu
           setPendingSnapTarget({ location, snap: hoveredSnap })
         } else {
           setDrawingWaypoints((prev) => [...prev, [location.lat, location.lng]])
@@ -1277,15 +1324,58 @@ export const MapView = () => {
     setSplitTarget(null)
   }
 
-  // Handle Snapping Option 1: Connect to Existing Path
-  const handleSnapConnect = () => {
+  // Smart Merge Option A: 🟢 Merge With Existing Path (extend road without node / split)
+  const handleSnapMerge = () => {
+    if (!pendingSnapTarget || !selectedStartNode) return
+
+    const { snap } = pendingSnapTarget
+    const originalEdge = snap.edge
+    const fromNode = nodesMap.get(originalEdge.fromNodeId)
+    const toNode = nodesMap.get(originalEdge.toNodeId)
+
+    const baseGeometry: [number, number][] =
+      originalEdge.geometry && originalEdge.geometry.length >= 2
+        ? originalEdge.geometry
+        : fromNode && toNode
+        ? [
+            [fromNode.latitude, fromNode.longitude],
+            [toNode.latitude, toNode.longitude],
+          ]
+        : [[snap.point[0], snap.point[1]]]
+
+    const splitIdx = snap.segmentIndex
+    const drawnSegment: [number, number][] = [
+      [selectedStartNode.latitude, selectedStartNode.longitude],
+      ...drawingWaypoints,
+      snap.point,
+    ]
+
+    const mergedGeometry: [number, number][] = [
+      ...baseGeometry.slice(0, splitIdx + 1),
+      ...drawnSegment,
+      ...baseGeometry.slice(splitIdx + 1),
+    ]
+
+    const newDist = calculatePathDistance(mergedGeometry)
+    const updatedEdge: EdgeItem = {
+      ...originalEdge,
+      geometry: mergedGeometry,
+      distance: newDist,
+      walkingTime: Math.round(newDist / 1.4),
+    }
+
+    setEdges((prev) => prev.map((e) => (e.id === updatedEdge.id ? updatedEdge : e)))
+    resetPathDrawingState()
+  }
+
+  // Smart Merge Option B: 🔵 Create Junction (split road & create/reuse nav node)
+  const handleSnapJunction = () => {
     if (!pendingSnapTarget) return
 
     const { snap } = pendingSnapTarget
     const snapLat = snap.point[0]
     const snapLng = snap.point[1]
 
-    // Check if an existing Navigation Node exists within 3 meters
     const nearbyNavNode = nodes.find(
       (n) => calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
     )
@@ -1295,7 +1385,6 @@ export const MapView = () => {
     if (nearbyNavNode) {
       connectNode = nearbyNavNode
     } else {
-      // Create new Navigation Node at snapped position and split existing path
       const navNodeId = `node-nav-${Date.now()}`
       connectNode = {
         id: navNodeId,
@@ -1355,13 +1444,12 @@ export const MapView = () => {
       setEdges((prev) => [...prev.filter((e) => e.id !== originalEdge.id), edge1, edge2])
     }
 
-    // Set end node as connectNode to complete current path
     setSelectedEndNode(connectNode)
     setPendingSnapTarget(null)
     setHoveredSnap(null)
   }
 
-  // Handle Snapping Option 2: Continue Drawing as Separate Path
+  // Smart Merge Option C: ⚪ Continue Drawing as Separate Path
   const handleSnapContinueSeparate = () => {
     if (!pendingSnapTarget) return
     const { location } = pendingSnapTarget
@@ -1648,8 +1736,9 @@ export const MapView = () => {
           {drawStep === 'drawing_waypoints' && (
             <div className="flex items-center space-x-3">
               <span>
-                Start: <strong className="text-white">{selectedStartNode?.name}</strong>. Click map to add route waypoints ({drawingWaypoints.length} added).
-                {hoveredSnap && <span className="text-sky-300 ml-2 animate-pulse">🎯 Snapping to nearby path</span>}
+                Start: <strong className="text-white">{selectedStartNode?.name}</strong>. Click map for waypoints ({drawingWaypoints.length} added).
+                <span className="text-slate-300 text-[11px] ml-2">(ESC: Cancel | Backspace/Ctrl+Z: Undo)</span>
+                {hoveredSnap && <span className="text-sky-300 ml-2 animate-pulse">🎯 Snapping active</span>}
               </span>
               <button
                 type="button"
@@ -1902,7 +1991,8 @@ export const MapView = () => {
               snap={pendingSnapTarget.snap}
               fromNodeName={nodesMap.get(pendingSnapTarget.snap.edge.fromNodeId)?.name || pendingSnapTarget.snap.edge.fromNodeId}
               toNodeName={nodesMap.get(pendingSnapTarget.snap.edge.toNodeId)?.name || pendingSnapTarget.snap.edge.toNodeId}
-              onConnect={handleSnapConnect}
+              onMerge={handleSnapMerge}
+              onJunction={handleSnapJunction}
               onContinueSeparate={handleSnapContinueSeparate}
               onCancel={() => setPendingSnapTarget(null)}
             />
