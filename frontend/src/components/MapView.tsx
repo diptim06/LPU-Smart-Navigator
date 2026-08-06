@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import initialNodesData from '../../../backend/data/nodes.json'
 
 const LPU_COORDINATES: [number, number] = [31.2536, 75.7037]
 const INITIAL_ZOOM = 16
 const MIN_ZOOM = 15
-const MAX_ZOOM = 19
+const MAX_ZOOM = 22
+const MAX_NATIVE_ZOOM = 19
 const LOCAL_STORAGE_NODES_KEY = 'lpu_nodes_working_dataset'
 const LOCAL_STORAGE_EDGES_KEY = 'lpu_edges_working_dataset'
 
@@ -19,6 +21,27 @@ const LPU_BOUNDS: LatLngBoundsExpression = [
   [31.2650, 75.7200], // North-East [lat, lng]
 ]
 
+const lockedEndpointIcon = L.divIcon({
+  className: 'custom-locked-endpoint-icon',
+  html: '<div style="width:12px;height:12px;background:#64748b;border:2px solid #ffffff;border-radius:3px;box-shadow:0 2px 4px rgba(0,0,0,0.4);" title="Locked Endpoint"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+})
+
+const intermediateWaypointIcon = L.divIcon({
+  className: 'custom-waypoint-icon',
+  html: '<div style="width:12px;height:12px;background:#f59e0b;border:2px solid #ffffff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+})
+
+const selectedWaypointIcon = L.divIcon({
+  className: 'custom-selected-waypoint-icon',
+  html: '<div style="width:14px;height:14px;background:#ef4444;border:2px solid #ffffff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.5);cursor:grab;"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+})
+
 export interface NodeItem {
   id: string
   name: string
@@ -26,6 +49,7 @@ export interface NodeItem {
   type: string
   latitude: number
   longitude: number
+  isHidden?: boolean
 }
 
 export interface EdgeItem {
@@ -214,6 +238,60 @@ const getClosestSegmentIndex = (geometry: [number, number][], clickPt: [number, 
   }
 
   return closestIndex
+}
+
+// Split an edge topologically at a specific node coordinate
+const splitEdgeAtNode = (
+  originalEdge: EdgeItem,
+  node: NodeItem,
+  segmentIndex: number,
+  nodesMap: Map<string, NodeItem>
+): { edge1: EdgeItem; edge2: EdgeItem } => {
+  const fromNode = nodesMap.get(originalEdge.fromNodeId)
+  const toNode = nodesMap.get(originalEdge.toNodeId)
+
+  const baseGeometry: [number, number][] =
+    originalEdge.geometry && originalEdge.geometry.length >= 2
+      ? originalEdge.geometry
+      : fromNode && toNode
+      ? [
+          [fromNode.latitude, fromNode.longitude],
+          [toNode.latitude, toNode.longitude],
+        ]
+      : [[node.latitude, node.longitude]]
+
+  const navPt: [number, number] = [node.latitude, node.longitude]
+  const geomPart1: [number, number][] = [...baseGeometry.slice(0, segmentIndex + 1), navPt]
+  const geomPart2: [number, number][] = [navPt, ...baseGeometry.slice(segmentIndex + 1)]
+
+  const dist1 = calculatePathDistance(geomPart1)
+  const dist2 = calculatePathDistance(geomPart2)
+
+  const timestamp = Date.now()
+
+  const edge1: EdgeItem = {
+    id: `edge-${timestamp}-1`,
+    fromNodeId: originalEdge.fromNodeId,
+    toNodeId: node.id,
+    geometry: geomPart1,
+    distance: dist1,
+    walkingTime: Math.round(dist1 / 1.4),
+    pathType: originalEdge.pathType,
+    isBidirectional: originalEdge.isBidirectional,
+  }
+
+  const edge2: EdgeItem = {
+    id: `edge-${timestamp}-2`,
+    fromNodeId: node.id,
+    toNodeId: originalEdge.toNodeId,
+    geometry: geomPart2,
+    distance: dist2,
+    walkingTime: Math.round(dist2 / 1.4),
+    pathType: originalEdge.pathType,
+    isBidirectional: originalEdge.isBidirectional,
+  }
+
+  return { edge1, edge2 }
 }
 
 interface MapEventsProps {
@@ -777,10 +855,11 @@ interface EditPathFormProps {
   toNodeName: string
   onSave: (updatedEdge: EdgeItem) => void
   onDelete: (edgeId: string) => void
+  onEditGeometry: () => void
   onCancel: () => void
 }
 
-const EditPathForm = ({ edge, fromNodeName, toNodeName, onSave, onDelete, onCancel }: EditPathFormProps) => {
+const EditPathForm = ({ edge, fromNodeName, toNodeName, onSave, onDelete, onEditGeometry, onCancel }: EditPathFormProps) => {
   const isPreset = (SUPPORTED_PATH_TYPES as readonly string[]).includes(edge.pathType) && edge.pathType !== 'custom'
 
   const [walkingTime, setWalkingTime] = useState<string>(edge.walkingTime.toString())
@@ -806,7 +885,7 @@ const EditPathForm = ({ edge, fromNodeName, toNodeName, onSave, onDelete, onCanc
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-1 min-w-[240px] space-y-2 text-slate-900 font-sans">
+    <form onSubmit={handleSubmit} className="p-1 min-w-[250px] space-y-2 text-slate-900 font-sans">
       <div className="font-bold text-sm text-indigo-900 border-b border-slate-200 pb-1 flex justify-between items-center">
         <span>Edit Path</span>
         <span className="text-[10px] font-mono text-slate-400">{edge.id}</span>
@@ -904,13 +983,22 @@ const EditPathForm = ({ edge, fromNodeName, toNodeName, onSave, onDelete, onCanc
       </div>
 
       <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="px-2.5 py-1 text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded font-medium transition-colors"
-        >
-          Delete Path
-        </button>
+        <div className="flex space-x-1.5">
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="px-2.5 py-1 text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded font-medium transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={onEditGeometry}
+            className="px-2.5 py-1 text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded font-semibold transition-colors flex items-center space-x-1"
+          >
+            <span>✏️ Edit Geometry</span>
+          </button>
+        </div>
         <div className="flex space-x-2">
           <button
             type="button"
@@ -973,7 +1061,7 @@ const SnapActionForm = ({
           <div>
             <div>Merge With Existing Path</div>
             <div className="text-[10px] font-normal text-emerald-700 mt-0.5">
-              Extend road as one continuous path (no node / no split)
+              Connect to graph with an invisible junction node (continuous road look)
             </div>
           </div>
         </button>
@@ -987,7 +1075,7 @@ const SnapActionForm = ({
           <div>
             <div>Create Junction</div>
             <div className="text-[10px] font-normal text-blue-700 mt-0.5">
-              Insert/reuse Navigation node & split road into intersection
+              Insert/reuse visible Navigation node & split road into intersection
             </div>
           </div>
         </button>
@@ -1025,6 +1113,7 @@ const loadInitialNodes = (): NodeItem[] => {
         return parsed.map((n: any) => ({
           ...n,
           category: n.category || 'POI',
+          isHidden: Boolean(n.isHidden),
         })) as NodeItem[]
       }
     }
@@ -1034,6 +1123,7 @@ const loadInitialNodes = (): NodeItem[] => {
   return (initialNodesData as any[]).map((n) => ({
     ...n,
     category: n.category || 'POI',
+    isHidden: Boolean(n.isHidden),
   })) as NodeItem[]
 }
 
@@ -1071,6 +1161,10 @@ export const MapView = () => {
   const [selectedEndNode, setSelectedEndNode] = useState<NodeItem | null>(null)
   const [editingEdge, setEditingEdge] = useState<EdgeItem | null>(null)
 
+  // Edit Path Geometry States
+  const [editingGeometryEdge, setEditingGeometryEdge] = useState<EdgeItem | null>(null)
+  const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null)
+
   // Insert Navigation Node State
   const [splitTarget, setSplitTarget] = useState<{ location: ClickedLocation; edge: EdgeItem } | null>(null)
 
@@ -1100,30 +1194,40 @@ export const MapView = () => {
     }
   }, [edges])
 
-  // Global Keyboard shortcuts: ESC to cancel drawing, Backspace / Ctrl+Z to undo last waypoint
+  // Global Keyboard shortcuts: ESC to cancel drawing, Backspace / Ctrl+Z to undo last waypoint or delete selected waypoint
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isPathMode) return
-
       const targetTag = (e.target as HTMLElement)?.tagName?.toUpperCase()
       if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') {
         return
       }
 
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        resetPathDrawingState()
-      } else if (e.key === 'Backspace' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')) {
-        if (drawingWaypoints.length > 0) {
+      if (editingGeometryEdge && selectedWaypointIndex !== null) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (selectedWaypointIndex > 0 && selectedWaypointIndex < editingGeometryEdge.geometry.length - 1) {
+            e.preventDefault()
+            handleDeleteWaypoint(selectedWaypointIndex)
+            return
+          }
+        }
+      }
+
+      if (isPathMode) {
+        if (e.key === 'Escape') {
           e.preventDefault()
-          setDrawingWaypoints((prev) => prev.slice(0, -1))
+          resetPathDrawingState()
+        } else if (e.key === 'Backspace' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')) {
+          if (drawingWaypoints.length > 0) {
+            e.preventDefault()
+            setDrawingWaypoints((prev) => prev.slice(0, -1))
+          }
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isPathMode, drawingWaypoints.length])
+  }, [isPathMode, drawingWaypoints.length, editingGeometryEdge, selectedWaypointIndex])
 
   const resetPathDrawingState = () => {
     setDrawStep('select_start')
@@ -1161,6 +1265,11 @@ export const MapView = () => {
   }
 
   const handleMapClick = (location: ClickedLocation) => {
+    if (editingGeometryEdge) {
+      setSelectedWaypointIndex(null)
+      return
+    }
+
     if (isNodeMode) {
       setPendingNode(location)
       setEditingNode(null)
@@ -1181,6 +1290,8 @@ export const MapView = () => {
   }
 
   const handleNodeClick = (node: NodeItem) => {
+    if (editingGeometryEdge) return
+
     if (isPathMode) {
       if (drawStep === 'select_start') {
         setSelectedStartNode(node)
@@ -1210,6 +1321,7 @@ export const MapView = () => {
       type: type,
       latitude: Number(pendingNode.lat.toFixed(6)),
       longitude: Number(pendingNode.lng.toFixed(6)),
+      isHidden: false,
     }
 
     setNodes((prev) => [...prev, newNode])
@@ -1222,8 +1334,20 @@ export const MapView = () => {
   }
 
   const handleDeleteNode = (nodeId: string) => {
-    setNodes((prev) => prev.filter((n) => n.id !== nodeId))
-    setEdges((prev) => prev.filter((e) => e.fromNodeId !== nodeId && e.toNodeId !== nodeId))
+    const updatedNodes = nodes.filter((n) => n.id !== nodeId)
+    const updatedEdges = edges.filter((e) => e.fromNodeId !== nodeId && e.toNodeId !== nodeId)
+
+    // Garbage collect isolated hidden nodes (degree 0)
+    const cleanNodes = updatedNodes.filter((node) => {
+      if (node.isHidden) {
+        const edgeCount = updatedEdges.filter((e) => e.fromNodeId === node.id || e.toNodeId === node.id).length
+        if (edgeCount === 0) return false
+      }
+      return true
+    })
+
+    setNodes(cleanNodes)
+    setEdges(updatedEdges)
     setEditingNode(null)
   }
 
@@ -1254,8 +1378,96 @@ export const MapView = () => {
   }
 
   const handleDeleteEdge = (edgeId: string) => {
-    setEdges((prev) => prev.filter((e) => e.id !== edgeId))
+    const deletedEdge = edges.find((e) => e.id === edgeId)
+    const remainingEdges = edges.filter((e) => e.id !== edgeId)
+    setEdges(remainingEdges)
+
+    if (deletedEdge) {
+      const impactedNodeIds = [deletedEdge.fromNodeId, deletedEdge.toNodeId]
+      setNodes((prevNodes) =>
+        prevNodes.filter((node) => {
+          if (node.isHidden && impactedNodeIds.includes(node.id)) {
+            const edgeCount = remainingEdges.filter(
+              (e) => e.fromNodeId === node.id || e.toNodeId === node.id
+            ).length
+            if (edgeCount === 0) {
+              console.log(`Cleaned up isolated hidden node: ${node.id}`)
+              return false
+            }
+          }
+          return true
+        })
+      )
+    }
+
     setEditingEdge(null)
+    setEditingGeometryEdge(null)
+  }
+
+  // Edit Path Geometry Helper Methods
+  const handleWaypointDragEnd = (index: number, e: L.DragEndEvent) => {
+    if (!editingGeometryEdge) return
+    const marker = e.target
+    const position = marker.getLatLng()
+    const newPt: [number, number] = [Number(position.lat.toFixed(6)), Number(position.lng.toFixed(6))]
+
+    const newGeom = [...editingGeometryEdge.geometry]
+    newGeom[index] = newPt
+    const newDist = calculatePathDistance(newGeom)
+
+    const updatedEdge: EdgeItem = {
+      ...editingGeometryEdge,
+      geometry: newGeom,
+      distance: newDist,
+      walkingTime: Math.round(newDist / 1.4),
+    }
+
+    setEditingGeometryEdge(updatedEdge)
+    setEdges((prev) => prev.map((item) => (item.id === updatedEdge.id ? updatedEdge : item)))
+  }
+
+  const handleInsertWaypointOnPolyline = (clickLat: number, clickLng: number) => {
+    if (!editingGeometryEdge) return
+
+    const clickPt: [number, number] = [Number(clickLat.toFixed(6)), Number(clickLng.toFixed(6))]
+    const segIdx = getClosestSegmentIndex(editingGeometryEdge.geometry, clickPt)
+
+    const newGeom = [
+      ...editingGeometryEdge.geometry.slice(0, segIdx + 1),
+      clickPt,
+      ...editingGeometryEdge.geometry.slice(segIdx + 1),
+    ]
+
+    const newDist = calculatePathDistance(newGeom)
+    const updatedEdge: EdgeItem = {
+      ...editingGeometryEdge,
+      geometry: newGeom,
+      distance: newDist,
+      walkingTime: Math.round(newDist / 1.4),
+    }
+
+    setEditingGeometryEdge(updatedEdge)
+    setSelectedWaypointIndex(segIdx + 1)
+    setEdges((prev) => prev.map((item) => (item.id === updatedEdge.id ? updatedEdge : item)))
+  }
+
+  const handleDeleteWaypoint = (index: number) => {
+    if (!editingGeometryEdge) return
+    if (index <= 0 || index >= editingGeometryEdge.geometry.length - 1) return
+
+    const newGeom = editingGeometryEdge.geometry.filter((_, idx) => idx !== index)
+    const newDist = calculatePathDistance(newGeom)
+
+    const updatedEdge: EdgeItem = {
+      ...editingGeometryEdge,
+      geometry: newGeom,
+      distance: newDist,
+      walkingTime: Math.round(newDist / 1.4),
+    }
+
+    setEditingGeometryEdge(updatedEdge)
+    setSelectedWaypointIndex(null)
+    setEdges((prev) => prev.map((item) => (item.id === updatedEdge.id ? updatedEdge : item)))
   }
 
   const handleConfirmSplitPath = (navName: string, navType: string) => {
@@ -1273,108 +1485,34 @@ export const MapView = () => {
       type: navType,
       latitude: clickedLat,
       longitude: clickedLng,
+      isHidden: false,
     }
 
-    const fromNode = nodesMap.get(originalEdge.fromNodeId)
-    const toNode = nodesMap.get(originalEdge.toNodeId)
-
-    const baseGeometry: [number, number][] =
+    const splitIndex = getClosestSegmentIndex(
       originalEdge.geometry && originalEdge.geometry.length >= 2
         ? originalEdge.geometry
-        : fromNode && toNode
-        ? [
-            [fromNode.latitude, fromNode.longitude],
-            [toNode.latitude, toNode.longitude],
-          ]
-        : [[clickedLat, clickedLng]]
+        : [
+            [nodesMap.get(originalEdge.fromNodeId)?.latitude || 0, nodesMap.get(originalEdge.fromNodeId)?.longitude || 0],
+            [nodesMap.get(originalEdge.toNodeId)?.latitude || 0, nodesMap.get(originalEdge.toNodeId)?.longitude || 0],
+          ],
+      [clickedLat, clickedLng]
+    )
 
-    const splitIndex = getClosestSegmentIndex(baseGeometry, [clickedLat, clickedLng])
-    const navPt: [number, number] = [clickedLat, clickedLng]
-
-    const geomPart1: [number, number][] = [...baseGeometry.slice(0, splitIndex + 1), navPt]
-    const geomPart2: [number, number][] = [navPt, ...baseGeometry.slice(splitIndex + 1)]
-
-    const dist1 = calculatePathDistance(geomPart1)
-    const dist2 = calculatePathDistance(geomPart2)
-
-    const edge1: EdgeItem = {
-      id: `edge-${Date.now()}-1`,
-      fromNodeId: originalEdge.fromNodeId,
-      toNodeId: navNodeId,
-      geometry: geomPart1,
-      distance: dist1,
-      walkingTime: Math.round(dist1 / 1.4),
-      pathType: originalEdge.pathType,
-      isBidirectional: originalEdge.isBidirectional,
-    }
-
-    const edge2: EdgeItem = {
-      id: `edge-${Date.now()}-2`,
-      fromNodeId: navNodeId,
-      toNodeId: originalEdge.toNodeId,
-      geometry: geomPart2,
-      distance: dist2,
-      walkingTime: Math.round(dist2 / 1.4),
-      pathType: originalEdge.pathType,
-      isBidirectional: originalEdge.isBidirectional,
-    }
+    const { edge1, edge2 } = splitEdgeAtNode(originalEdge, newNavNode, splitIndex, nodesMap)
 
     setNodes((prev) => [...prev, newNavNode])
     setEdges((prev) => [...prev.filter((e) => e.id !== originalEdge.id), edge1, edge2])
     setSplitTarget(null)
   }
 
-  // Smart Merge Option A: 🟢 Merge With Existing Path (extend road without node / split)
+  // Smart Merge Option A: 🟢 Merge With Existing Path (create/reuse HIDDEN Navigation node & ATOMICALLY save incoming edge)
   const handleSnapMerge = () => {
     if (!pendingSnapTarget || !selectedStartNode) return
 
     const { snap } = pendingSnapTarget
-    const originalEdge = snap.edge
-    const fromNode = nodesMap.get(originalEdge.fromNodeId)
-    const toNode = nodesMap.get(originalEdge.toNodeId)
-
-    const baseGeometry: [number, number][] =
-      originalEdge.geometry && originalEdge.geometry.length >= 2
-        ? originalEdge.geometry
-        : fromNode && toNode
-        ? [
-            [fromNode.latitude, fromNode.longitude],
-            [toNode.latitude, toNode.longitude],
-          ]
-        : [[snap.point[0], snap.point[1]]]
-
-    const splitIdx = snap.segmentIndex
-    const drawnSegment: [number, number][] = [
-      [selectedStartNode.latitude, selectedStartNode.longitude],
-      ...drawingWaypoints,
-      snap.point,
-    ]
-
-    const mergedGeometry: [number, number][] = [
-      ...baseGeometry.slice(0, splitIdx + 1),
-      ...drawnSegment,
-      ...baseGeometry.slice(splitIdx + 1),
-    ]
-
-    const newDist = calculatePathDistance(mergedGeometry)
-    const updatedEdge: EdgeItem = {
-      ...originalEdge,
-      geometry: mergedGeometry,
-      distance: newDist,
-      walkingTime: Math.round(newDist / 1.4),
-    }
-
-    setEdges((prev) => prev.map((e) => (e.id === updatedEdge.id ? updatedEdge : e)))
-    resetPathDrawingState()
-  }
-
-  // Smart Merge Option B: 🔵 Create Junction (split road & create/reuse nav node)
-  const handleSnapJunction = () => {
-    if (!pendingSnapTarget) return
-
-    const { snap } = pendingSnapTarget
-    const snapLat = snap.point[0]
-    const snapLng = snap.point[1]
+    const snapLat = Number(snap.point[0].toFixed(6))
+    const snapLng = Number(snap.point[1].toFixed(6))
+    const timestamp = Date.now()
 
     const nearbyNavNode = nodes.find(
       (n) => calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
@@ -1383,9 +1521,81 @@ export const MapView = () => {
     let connectNode: NodeItem
 
     if (nearbyNavNode) {
-      connectNode = nearbyNavNode
+      connectNode = { ...nearbyNavNode, isHidden: true }
+      setNodes((prev) => prev.map((n) => (n.id === connectNode.id ? connectNode : n)))
     } else {
-      const navNodeId = `node-nav-${Date.now()}`
+      const navNodeId = `node-nav-${timestamp}`
+      connectNode = {
+        id: navNodeId,
+        name: 'Merge Junction',
+        category: 'Navigation',
+        type: 'road_junction',
+        latitude: snapLat,
+        longitude: snapLng,
+        isHidden: true, // Invisible Merge Node
+      }
+      setNodes((prev) => [...prev, connectNode])
+    }
+
+    const originalEdge = snap.edge
+    const isAlreadyConnected = originalEdge.fromNodeId === connectNode.id || originalEdge.toNodeId === connectNode.id
+
+    let newReplacementEdges: EdgeItem[] = []
+    if (!isAlreadyConnected) {
+      const { edge1, edge2 } = splitEdgeAtNode(originalEdge, connectNode, snap.segmentIndex, nodesMap)
+      newReplacementEdges = [edge1, edge2]
+    }
+
+    // Construct geometry for incoming drawn path ending EXACTLY at connectNode [snapLat, snapLng]
+    const incomingGeometry: [number, number][] = [
+      [selectedStartNode.latitude, selectedStartNode.longitude],
+      ...drawingWaypoints,
+      [snapLat, snapLng],
+    ]
+
+    const incomingDist = calculatePathDistance(incomingGeometry)
+
+    const incomingEdge: EdgeItem = {
+      id: `edge-incoming-${timestamp}`,
+      fromNodeId: selectedStartNode.id,
+      toNodeId: connectNode.id,
+      geometry: incomingGeometry,
+      distance: incomingDist,
+      walkingTime: Math.round(incomingDist / 1.4),
+      pathType: originalEdge.pathType || 'road',
+      isBidirectional: originalEdge.isBidirectional !== false,
+    }
+
+    // Atomically persist replacement edges and incoming edge to edges state
+    setEdges((prev) => {
+      const filtered = isAlreadyConnected ? prev : prev.filter((e) => e.id !== originalEdge.id)
+      return [...filtered, ...newReplacementEdges, incomingEdge]
+    })
+
+    // Reset drawing state only AFTER incoming edge has been added to edges state
+    resetPathDrawingState()
+  }
+
+  // Smart Merge Option B: BLUE Create Junction (create/reuse VISIBLE Navigation node & ATOMICALLY save incoming edge)
+  const handleSnapJunction = () => {
+    if (!pendingSnapTarget || !selectedStartNode) return
+
+    const { snap } = pendingSnapTarget
+    const snapLat = Number(snap.point[0].toFixed(6))
+    const snapLng = Number(snap.point[1].toFixed(6))
+    const timestamp = Date.now()
+
+    const nearbyNavNode = nodes.find(
+      (n) => calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
+    )
+
+    let connectNode: NodeItem
+
+    if (nearbyNavNode) {
+      connectNode = { ...nearbyNavNode, isHidden: false }
+      setNodes((prev) => prev.map((n) => (n.id === connectNode.id ? connectNode : n)))
+    } else {
+      const navNodeId = `node-nav-${timestamp}`
       connectNode = {
         id: navNodeId,
         name: 'Road Junction',
@@ -1393,60 +1603,45 @@ export const MapView = () => {
         type: 'road_junction',
         latitude: snapLat,
         longitude: snapLng,
+        isHidden: false, // Visible Navigation Node
       }
-
-      const originalEdge = snap.edge
-      const fromNode = nodesMap.get(originalEdge.fromNodeId)
-      const toNode = nodesMap.get(originalEdge.toNodeId)
-
-      const baseGeometry: [number, number][] =
-        originalEdge.geometry && originalEdge.geometry.length >= 2
-          ? originalEdge.geometry
-          : fromNode && toNode
-          ? [
-              [fromNode.latitude, fromNode.longitude],
-              [toNode.latitude, toNode.longitude],
-            ]
-          : [[snapLat, snapLng]]
-
-      const splitIndex = snap.segmentIndex
-      const navPt: [number, number] = [snapLat, snapLng]
-
-      const geomPart1: [number, number][] = [...baseGeometry.slice(0, splitIndex + 1), navPt]
-      const geomPart2: [number, number][] = [navPt, ...baseGeometry.slice(splitIndex + 1)]
-
-      const dist1 = calculatePathDistance(geomPart1)
-      const dist2 = calculatePathDistance(geomPart2)
-
-      const edge1: EdgeItem = {
-        id: `edge-${Date.now()}-1`,
-        fromNodeId: originalEdge.fromNodeId,
-        toNodeId: navNodeId,
-        geometry: geomPart1,
-        distance: dist1,
-        walkingTime: Math.round(dist1 / 1.4),
-        pathType: originalEdge.pathType,
-        isBidirectional: originalEdge.isBidirectional,
-      }
-
-      const edge2: EdgeItem = {
-        id: `edge-${Date.now()}-2`,
-        fromNodeId: navNodeId,
-        toNodeId: originalEdge.toNodeId,
-        geometry: geomPart2,
-        distance: dist2,
-        walkingTime: Math.round(dist2 / 1.4),
-        pathType: originalEdge.pathType,
-        isBidirectional: originalEdge.isBidirectional,
-      }
-
       setNodes((prev) => [...prev, connectNode])
-      setEdges((prev) => [...prev.filter((e) => e.id !== originalEdge.id), edge1, edge2])
     }
 
-    setSelectedEndNode(connectNode)
-    setPendingSnapTarget(null)
-    setHoveredSnap(null)
+    const originalEdge = snap.edge
+    const isAlreadyConnected = originalEdge.fromNodeId === connectNode.id || originalEdge.toNodeId === connectNode.id
+
+    let newReplacementEdges: EdgeItem[] = []
+    if (!isAlreadyConnected) {
+      const { edge1, edge2 } = splitEdgeAtNode(originalEdge, connectNode, snap.segmentIndex, nodesMap)
+      newReplacementEdges = [edge1, edge2]
+    }
+
+    const incomingGeometry: [number, number][] = [
+      [selectedStartNode.latitude, selectedStartNode.longitude],
+      ...drawingWaypoints,
+      [snapLat, snapLng],
+    ]
+
+    const incomingDist = calculatePathDistance(incomingGeometry)
+
+    const incomingEdge: EdgeItem = {
+      id: `edge-incoming-${timestamp}`,
+      fromNodeId: selectedStartNode.id,
+      toNodeId: connectNode.id,
+      geometry: incomingGeometry,
+      distance: incomingDist,
+      walkingTime: Math.round(incomingDist / 1.4),
+      pathType: originalEdge.pathType || 'road',
+      isBidirectional: originalEdge.isBidirectional !== false,
+    }
+
+    setEdges((prev) => {
+      const filtered = isAlreadyConnected ? prev : prev.filter((e) => e.id !== originalEdge.id)
+      return [...filtered, ...newReplacementEdges, incomingEdge]
+    })
+
+    resetPathDrawingState()
   }
 
   // Smart Merge Option C: ⚪ Continue Drawing as Separate Path
@@ -1477,6 +1672,7 @@ export const MapView = () => {
           ).map((item: any) => ({
             ...item,
             category: item.category || 'POI',
+            isHidden: Boolean(item.isHidden),
           })) as NodeItem[]
 
           if (validNodes.length > 0) {
@@ -1560,7 +1756,11 @@ export const MapView = () => {
 
   const handleReloadOfficial = () => {
     if (window.confirm('Reset current dataset to official backend/data/nodes.json? Any unsaved edits will be discarded.')) {
-      const official = (initialNodesData as any[]).map((n) => ({ ...n, category: n.category || 'POI' })) as NodeItem[]
+      const official = (initialNodesData as any[]).map((n) => ({
+        ...n,
+        category: n.category || 'POI',
+        isHidden: Boolean(n.isHidden),
+      })) as NodeItem[]
       setNodes(official)
       setPendingNode(null)
       setEditingNode(null)
@@ -1765,11 +1965,37 @@ export const MapView = () => {
         </div>
       )}
 
+      {/* Geometry Editing Mode Guidance Banner */}
+      {editingGeometryEdge && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-amber-950/90 text-amber-200 border border-amber-600/60 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md text-xs font-medium flex items-center space-x-3 select-none">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+          <span>
+            ✏️ <strong>Editing Path Geometry</strong> ({editingGeometryEdge.distance}m, {editingGeometryEdge.geometry.length} points). Drag waypoints to reshape. Click line to add point.
+            {selectedWaypointIndex !== null && selectedWaypointIndex > 0 && selectedWaypointIndex < editingGeometryEdge.geometry.length - 1 && (
+              <span className="text-rose-300 font-bold ml-2">Backspace/Delete: remove pt #{selectedWaypointIndex}</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingGeometryEdge(null)
+              setSelectedWaypointIndex(null)
+            }}
+            className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1 rounded shadow text-xs transition-colors"
+          >
+            ✔ Finish Editing
+          </button>
+        </div>
+      )}
+
       <MapContainer
         center={LPU_COORDINATES}
         zoom={INITIAL_ZOOM}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        wheelDebounceTime={40}
         maxBounds={LPU_BOUNDS}
         maxBoundsViscosity={1.0}
         scrollWheelZoom={true}
@@ -1780,6 +2006,7 @@ export const MapView = () => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
+          maxNativeZoom={MAX_NATIVE_ZOOM}
         />
 
         {/* Render Hovered Snap Edge Highlight */}
@@ -1829,19 +2056,27 @@ export const MapView = () => {
                   [toNode.latitude, toNode.longitude],
                 ]
 
+          const isBeingGeomEdited = editingGeometryEdge?.id === edge.id
+
           return (
             <Polyline
               key={edge.id}
               positions={polyGeometry}
               pathOptions={{
-                color: edge.isBidirectional ? '#4f46e5' : '#0284c7',
-                weight: 4,
-                opacity: 0.85,
+                color: isBeingGeomEdited ? '#f59e0b' : edge.isBidirectional ? '#4f46e5' : '#0284c7',
+                weight: isBeingGeomEdited ? 7 : 4,
+                opacity: isBeingGeomEdited ? 0.95 : 0.85,
                 dashArray: edge.isBidirectional ? undefined : '6, 6',
               }}
               eventHandlers={{
                 click: (e) => {
                   e.originalEvent.stopPropagation()
+                  if (editingGeometryEdge) {
+                    if (editingGeometryEdge.id === edge.id) {
+                      handleInsertWaypointOnPolyline(e.latlng.lat, e.latlng.lng)
+                    }
+                    return
+                  }
                   if (isInsertNavMode) {
                     setSplitTarget({
                       location: { lat: e.latlng.lat, lng: e.latlng.lng },
@@ -1874,6 +2109,66 @@ export const MapView = () => {
           )
         })}
 
+        {/* Edit Geometry Mode Interactive Waypoint Markers */}
+        {editingGeometryEdge &&
+          editingGeometryEdge.geometry.map((pt, idx) => {
+            const isEndpoint = idx === 0 || idx === editingGeometryEdge.geometry.length - 1
+            const isSelected = selectedWaypointIndex === idx
+
+            if (isEndpoint) {
+              return (
+                <Marker
+                  key={`geom-pt-${idx}`}
+                  position={pt}
+                  draggable={false}
+                  icon={lockedEndpointIcon}
+                >
+                  <Tooltip opacity={0.9}>
+                    <span className="text-[10px] font-semibold text-slate-700">🔒 Locked Endpoint</span>
+                  </Tooltip>
+                </Marker>
+              )
+            }
+
+            return (
+              <Marker
+                key={`geom-pt-${idx}`}
+                position={pt}
+                draggable={true}
+                icon={isSelected ? selectedWaypointIcon : intermediateWaypointIcon}
+                eventHandlers={{
+                  click: (e) => {
+                    e.originalEvent.stopPropagation()
+                    setSelectedWaypointIndex(idx)
+                  },
+                  dragend: (e) => handleWaypointDragEnd(idx, e),
+                }}
+              >
+                <Tooltip opacity={0.95}>
+                  <div className="p-0.5 text-xs text-slate-900 font-sans">
+                    <div className="font-bold text-amber-700">Waypoint #{idx}</div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      {pt[0].toFixed(6)}, {pt[1].toFixed(6)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Drag to move | Backspace/Delete to remove
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteWaypoint(idx)
+                      }}
+                      className="mt-1 px-1.5 py-0.5 text-[10px] text-rose-700 bg-rose-50 border border-rose-200 rounded font-semibold hover:bg-rose-100"
+                    >
+                      Delete Waypoint
+                    </button>
+                  </div>
+                </Tooltip>
+              </Marker>
+            )
+          })}
+
         {/* Render Temporary Polyline During Active Path Drawing */}
         {isPathMode && activeDrawingGeometry.length >= 2 && (
           <Polyline
@@ -1903,8 +2198,10 @@ export const MapView = () => {
             />
           ))}
 
-        {/* Render Nodes (CircleMarkers) */}
+        {/* Render Visible Nodes (CircleMarkers) - Exclude Hidden Nodes */}
         {nodes.map((node) => {
+          if (node.isHidden) return null // Do NOT render hidden navigation nodes on map
+
           const isSelectedStart = selectedStartNode?.id === node.id
           const isSelectedEnd = selectedEndNode?.id === node.id
           const isNav = node.category === 'Navigation'
@@ -2056,6 +2353,11 @@ export const MapView = () => {
               toNodeName={nodesMap.get(editingEdge.toNodeId)?.name || editingEdge.toNodeId}
               onSave={handleUpdateEdge}
               onDelete={handleDeleteEdge}
+              onEditGeometry={() => {
+                setEditingGeometryEdge(editingEdge)
+                setEditingEdge(null)
+                setSelectedWaypointIndex(null)
+              }}
               onCancel={() => setEditingEdge(null)}
             />
           </Popup>
@@ -2065,7 +2367,7 @@ export const MapView = () => {
       </MapContainer>
 
       {/* Bottom Left Coordinate Indicator when modes are OFF */}
-      {!isNodeMode && !isPathMode && !isInsertNavMode && clickedCoords && (
+      {!isNodeMode && !isPathMode && !isInsertNavMode && !editingGeometryEdge && clickedCoords && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-slate-900/90 text-white px-4 py-3 rounded-lg shadow-xl backdrop-blur-md border border-slate-700 font-mono text-sm pointer-events-auto select-none">
           <div className="text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
             Clicked Coordinates
