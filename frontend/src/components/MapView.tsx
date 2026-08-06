@@ -4,6 +4,7 @@ import type { LatLngBoundsExpression } from 'leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import initialNodesData from '../../../backend/data/nodes.json'
+import { NavigationPanel } from './NavigationPanel'
 
 const LPU_COORDINATES: [number, number] = [31.2536, 75.7037]
 const INITIAL_ZOOM = 16
@@ -1782,6 +1783,9 @@ export const MapView = () => {
 
   return (
     <div className="relative h-screen w-screen m-0 p-0 overflow-hidden">
+      {/* Sprint 8.1: Search Engine Navigation Panel */}
+      <NavigationPanel nodes={nodes} />
+
       {/* Top Control Toolbar */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700/80 shadow-2xl text-white select-none">
         {/* Node Collection Mode Toggle */}

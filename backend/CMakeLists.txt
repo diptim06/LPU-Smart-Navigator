@@ -5,4 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(lpu_smart_navigator_backend main.cpp)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_executable(lpu_smart_navigator_backend
+    main.cpp
+    src/Graph.cpp
+    src/SearchIndex.cpp
+)

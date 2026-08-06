@@ -1,478 +1,1010 @@
 [
   {
-    "id": "node-1",
-    "name": "Main Gate",
-    "type": "gate",
-    "latitude": 31.2505,
-    "longitude": 75.701
-  },
-  {
-    "id": "node-2",
-    "name": "Uni Hospital",
-    "type": "hospital",
-    "latitude": 31.252,
-    "longitude": 75.7025
-  },
-  {
-    "id": "node-3",
-    "name": "Main Gate Intersection",
-    "type": "intersection",
-    "latitude": 31.251,
-    "longitude": 75.7015
-  },
-  {
-    "id": "node-4",
-    "name": "Central Library",
-    "type": "library",
-    "latitude": 31.253,
-    "longitude": 75.7042
-  },
-  {
-    "id": "node-5",
-    "name": "Food Court / Uni Mall",
-    "type": "food_court",
-    "latitude": 31.2535,
-    "longitude": 75.7035
-  },
-  {
-    "id": "node-6",
-    "name": "Main Roundabout",
-    "type": "roundabout",
-    "latitude": 31.2536,
-    "longitude": 75.7037
-  },
-  {
-    "id": "node-7",
-    "name": "Shanti Devi Mittal Auditorium",
-    "type": "auditorium",
-    "latitude": 31.2542,
-    "longitude": 75.705
-  },
-  {
     "id": "node-8",
     "name": "Baldev Raj Mittal Unipolis",
     "type": "landmark",
     "latitude": 31.254,
-    "longitude": 75.704
-  },
-  {
-    "id": "node-9",
-    "name": "Block 32",
-    "type": "building",
-    "latitude": 31.2545,
-    "longitude": 75.7028
-  },
-  {
-    "id": "node-10",
-    "name": "Block 33",
-    "type": "building",
-    "latitude": 31.2548,
-    "longitude": 75.7032
-  },
-  {
-    "id": "node-11",
-    "name": "Block 34",
-    "type": "building",
-    "latitude": 31.2552,
-    "longitude": 75.7036
-  },
-  {
-    "id": "node-12",
-    "name": "Robopark",
-    "type": "park",
-    "latitude": 31.255,
-    "longitude": 75.706
-  },
-  {
-    "id": "node-13",
-    "name": "Block 38",
-    "type": "building",
-    "latitude": 31.256,
-    "longitude": 75.7045
-  },
-  {
-    "id": "node-14",
-    "name": "Mall Road Intersection",
-    "type": "intersection",
-    "latitude": 31.2532,
-    "longitude": 75.703
-  },
-  {
-    "id": "node-15",
-    "name": "Block 34 North Intersection",
-    "type": "intersection",
-    "latitude": 31.2555,
-    "longitude": 75.7038
+    "longitude": 75.704,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923073795",
     "name": "Main Gate LPU",
     "type": "entrance",
     "latitude": 31.260623,
-    "longitude": 75.70676
+    "longitude": 75.70676,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923135510",
     "name": "Hostel students entry/exit",
     "type": "entrance",
     "latitude": 31.260355,
-    "longitude": 75.707428
+    "longitude": 75.707428,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923156376",
     "name": "Day Scholars entry/exit",
     "type": "entrance",
     "latitude": 31.260515,
-    "longitude": 75.70716
+    "longitude": 75.70716,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923198293",
     "name": "Vehicles checkpoint",
     "type": "road",
     "latitude": 31.260066,
-    "longitude": 75.706618
+    "longitude": 75.706618,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923287944",
     "name": "LPU Baldev Raj Mittal Park",
-    "type": "custom",
+    "type": "Park",
     "latitude": 31.259034,
-    "longitude": 75.706916
+    "longitude": 75.706916,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923336991",
     "name": "Uni Health Center",
     "type": "hospital",
     "latitude": 31.258018,
-    "longitude": 75.706822
+    "longitude": 75.706822,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923358741",
     "name": "Sunken Ground",
-    "type": "custom",
+    "type": "Park",
     "latitude": 31.258025,
-    "longitude": 75.707329
+    "longitude": 75.707329,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923410060",
     "name": "Uni Auditorium",
     "type": "building",
     "latitude": 31.258289,
-    "longitude": 75.7079
+    "longitude": 75.7079,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923467725",
     "name": "Underpass",
     "type": "road",
     "latitude": 31.257931,
-    "longitude": 75.706578
+    "longitude": 75.706578,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923488025",
     "name": "Uni Hospital park",
-    "type": "custom",
+    "type": "park",
     "latitude": 31.257363,
-    "longitude": 75.706991
+    "longitude": 75.706991,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923521112",
     "name": "Architecture Block",
     "type": "building",
     "latitude": 31.257048,
-    "longitude": 75.706854
+    "longitude": 75.706854,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923532845",
     "name": "Fashion Block",
     "type": "building",
     "latitude": 31.25706,
-    "longitude": 75.707353
+    "longitude": 75.707353,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923593761",
     "name": "Food Court (cc)",
     "type": "food_court",
     "latitude": 31.257812,
-    "longitude": 75.708195
+    "longitude": 75.708195,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923620026",
     "name": "Product and Industrial Block",
     "type": "building",
     "latitude": 31.256601,
-    "longitude": 75.706752
+    "longitude": 75.706752,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923639575",
     "name": "Nand Juice",
     "type": "food_court",
     "latitude": 31.256122,
-    "longitude": 75.706444
+    "longitude": 75.706444,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923658226",
     "name": "Uni Mall",
     "type": "building",
     "latitude": 31.255829,
-    "longitude": 75.705317
+    "longitude": 75.705317,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923680826",
     "name": "Lpu School of Hotel Management",
     "type": "building",
     "latitude": 31.255746,
-    "longitude": 75.704301
+    "longitude": 75.704301,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923734660",
     "name": "Baldev Raj Mittal Uni Polis",
     "type": "building",
     "latitude": 31.254948,
-    "longitude": 75.704698
-  },
-  {
-    "id": "node-1785923855762",
-    "name": "Division of Student Relationship,",
-    "type": "building",
-    "latitude": 31.255,
-    "longitude": 75.706
+    "longitude": 75.704698,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923871144",
     "name": "Block 14",
     "type": "building",
     "latitude": 31.254517,
-    "longitude": 75.705551
+    "longitude": 75.705551,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923899243",
     "name": "Spider Park",
     "type": "building",
     "latitude": 31.254077,
-    "longitude": 75.705623
+    "longitude": 75.705623,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923930226",
     "name": "LPU Main Parking",
     "type": "parking",
     "latitude": 31.253077,
-    "longitude": 75.705706
+    "longitude": 75.705706,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923946977",
     "name": "LPU Main Parking",
     "type": "parking",
     "latitude": 31.25183,
-    "longitude": 75.705701
+    "longitude": 75.705701,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785923989044",
     "name": "LPU Innovation Studio, Block 39",
     "type": "building",
     "latitude": 31.251025,
-    "longitude": 75.705746
+    "longitude": 75.705746,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924160011",
     "name": "Late Mrs. Mittal Samadhi",
     "type": "custom",
     "latitude": 31.253366,
-    "longitude": 75.70492
+    "longitude": 75.70492,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924234218",
     "name": "Division Of Admission LPU, Block 30",
     "type": "building",
     "latitude": 31.252802,
-    "longitude": 75.704722
+    "longitude": 75.704722,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924252241",
     "name": "Block 29",
     "type": "building",
     "latitude": 31.252694,
-    "longitude": 75.704113
+    "longitude": 75.704113,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924264061",
     "name": "Block 28",
     "type": "building",
     "latitude": 31.252667,
-    "longitude": 75.703665
+    "longitude": 75.703665,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924270315",
     "name": "Block 27",
     "type": "building",
     "latitude": 31.252678,
-    "longitude": 75.703247
+    "longitude": 75.703247,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924281067",
     "name": "Block 26",
     "type": "building",
     "latitude": 31.252678,
-    "longitude": 75.70285
+    "longitude": 75.70285,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924288284",
     "name": "Block 25",
     "type": "building",
     "latitude": 31.252701,
-    "longitude": 75.702418
+    "longitude": 75.702418,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924307733",
     "name": "Open Auditorium",
     "type": "custom",
     "latitude": 31.252155,
-    "longitude": 75.704108
+    "longitude": 75.704108,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924344300",
     "name": "Shanti Devi Mittal Auditorium",
     "type": "building",
     "latitude": 31.252123,
-    "longitude": 75.703713
+    "longitude": 75.703713,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924399734",
     "name": "Block 38",
     "type": "building",
     "latitude": 31.252171,
-    "longitude": 75.70311
+    "longitude": 75.70311,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924408487",
     "name": "Block 37",
     "type": "building",
     "latitude": 31.251853,
-    "longitude": 75.703585
+    "longitude": 75.703585,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924433851",
     "name": "Block 36",
     "type": "building",
     "latitude": 31.251637,
-    "longitude": 75.704083
+    "longitude": 75.704083,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924444202",
     "name": "Central Library",
     "type": "building",
     "latitude": 31.251905,
-    "longitude": 75.703649
+    "longitude": 75.703649,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924460201",
     "name": "Block 32",
     "type": "building",
     "latitude": 31.252199,
-    "longitude": 75.704722
+    "longitude": 75.704722,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924467886",
     "name": "Block 33",
     "type": "building",
     "latitude": 31.251855,
-    "longitude": 75.704692
+    "longitude": 75.704692,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924473502",
     "name": "Block 34",
     "type": "building",
     "latitude": 31.251534,
-    "longitude": 75.704703
+    "longitude": 75.704703,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924502986",
     "name": "34 Sitting Area",
     "type": "custom",
     "latitude": 31.251334,
-    "longitude": 75.704497
+    "longitude": 75.704497,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924515553",
     "name": "34 Sitting Area",
     "type": "building",
     "latitude": 31.251238,
-    "longitude": 75.704687
+    "longitude": 75.704687,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924574387",
     "name": "34 Food Court",
     "type": "food_court",
     "latitude": 31.250754,
-    "longitude": 75.704649
+    "longitude": 75.704649,
+    "category": "POI",
+    "isHidden": true
   },
   {
     "id": "node-1785924613723",
     "name": "Robo Park",
-    "type": "custom",
+    "type": "Park",
     "latitude": 31.253499,
-    "longitude": 75.702882
+    "longitude": 75.702882,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924665386",
     "name": "LPU Helipad",
-    "type": "custom",
+    "type": "Park",
     "latitude": 31.254432,
-    "longitude": 75.702906
+    "longitude": 75.702906,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924711655",
     "name": "Block 18",
     "type": "building",
     "latitude": 31.255253,
-    "longitude": 75.703349
+    "longitude": 75.703349,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924735455",
     "name": "Girls Hostel 3",
     "type": "building",
     "latitude": 31.256195,
-    "longitude": 75.70425
+    "longitude": 75.70425,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924785255",
     "name": "Girls Hostel 9,10",
     "type": "building",
     "latitude": 31.257622,
-    "longitude": 75.704655
+    "longitude": 75.704655,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924798222",
     "name": "Girls Hostel 2",
     "type": "building",
     "latitude": 31.256753,
-    "longitude": 75.704671
+    "longitude": 75.704671,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924821523",
     "name": "Girls Hostel 1",
     "type": "building",
     "latitude": 31.256886,
-    "longitude": 75.705304
+    "longitude": 75.705304,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924831856",
     "name": "Security Office",
     "type": "building",
     "latitude": 31.256831,
-    "longitude": 75.705738
+    "longitude": 75.705738,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924861973",
     "name": "Tungstile: GH 1,2,9,10",
     "type": "building",
     "latitude": 31.257046,
-    "longitude": 75.705709
+    "longitude": 75.705709,
+    "category": "POI",
+    "isHidden": false
   },
   {
     "id": "node-1785924879156",
     "name": "Girls Hostel 4",
     "type": "building",
     "latitude": 31.256493,
-    "longitude": 75.705685
+    "longitude": 75.705685,
+    "category": "POI",
+    "isHidden": false
+  },
+  {
+    "id": "node-1785994418803",
+    "name": "Tungstile",
+    "category": "POI",
+    "type": "entrance",
+    "latitude": 31.260506,
+    "longitude": 75.706894,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785994601084",
+    "name": "Uni Hospital Entrance",
+    "category": "Navigation",
+    "type": "Entrance",
+    "latitude": 31.258259,
+    "longitude": 75.706825,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785994634368",
+    "name": "Park Entrance",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.258621,
+    "longitude": 75.706884,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785997637986",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.260433,
+    "longitude": 75.706876,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999428796",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.259894,
+    "longitude": 75.706737,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999476700",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.259889,
+    "longitude": 75.707246,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999549666",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.259454,
+    "longitude": 75.706716,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999562883",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.259444,
+    "longitude": 75.707216,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999579650",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.258589,
+    "longitude": 75.70689,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999644269",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.258587,
+    "longitude": 75.707208,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999696237",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.258433,
+    "longitude": 75.707519,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999730654",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.258124,
+    "longitude": 75.707554,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999770039",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257823,
+    "longitude": 75.707817,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999821324",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257122,
+    "longitude": 75.707324,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1785999836991",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257117,
+    "longitude": 75.706851,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999883092",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257243,
+    "longitude": 75.706841,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999889059",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257232,
+    "longitude": 75.707326,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1785999897875",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257238,
+    "longitude": 75.706996,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786000162866",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.256892,
+    "longitude": 75.70654,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786000194717",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.256597,
+    "longitude": 75.70642,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786000226828",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.256998,
+    "longitude": 75.70588,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786000277846",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.25699,
+    "longitude": 75.705246,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786000298664",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.257123,
+    "longitude": 75.705418,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786000394068",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255984,
+    "longitude": 75.705374,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786000427371",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255831,
+    "longitude": 75.704263,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786000865443",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.25614,
+    "longitude": 75.706229,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786001023985",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255856,
+    "longitude": 75.705661,
+    "isHidden": true
+  },
+  {
+    "id": "node-1786001100309",
+    "name": "Division of Student Relationship,",
+    "category": "POI",
+    "type": "building",
+    "latitude": 31.255106,
+    "longitude": 75.706041,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786001135390",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255718,
+    "longitude": 75.705969,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001199004",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255806,
+    "longitude": 75.705818,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001224369",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.254886,
+    "longitude": 75.705379,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786001342821",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.253758,
+    "longitude": 75.704427,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001352605",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.253229,
+    "longitude": 75.703797,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001361355",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.253518,
+    "longitude": 75.704131,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001381506",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.253256,
+    "longitude": 75.702874,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001534930",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252996,
+    "longitude": 75.703272,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001608118",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252671,
+    "longitude": 75.703472,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786001624585",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252219,
+    "longitude": 75.703469,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786001674820",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.253392,
+    "longitude": 75.703557,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786003826309",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252986,
+    "longitude": 75.704153,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786003862810",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.25302,
+    "longitude": 75.703923,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786004058765",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252387,
+    "longitude": 75.703874,
+    "isHidden": true
+  },
+  {
+    "id": "node-1786004145777",
+    "name": "Block 32",
+    "category": "POI",
+    "type": "building",
+    "latitude": 31.252209,
+    "longitude": 75.704725,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786004177969",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.255716,
+    "longitude": 75.705967,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786004327706",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.251848,
+    "longitude": 75.705007,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786004427192",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252203,
+    "longitude": 75.70505,
+    "isHidden": true
+  },
+  {
+    "id": "node-1786004471611",
+    "name": "Central Library",
+    "category": "POI",
+    "type": "building",
+    "latitude": 31.251908,
+    "longitude": 75.703647,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786004507478",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.251536,
+    "longitude": 75.704386,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786004531079",
+    "name": "Corridor Junction",
+    "category": "Navigation",
+    "type": "corridor_junction",
+    "latitude": 31.251815,
+    "longitude": 75.704099,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786004549729",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.251799,
+    "longitude": 75.70439,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786004559413",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.25133,
+    "longitude": 75.704387,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786004582814",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.251525,
+    "longitude": 75.705005,
+    "isHidden": false
+  },
+  {
+    "id": "node-1786004628597",
+    "name": "34 Food Court",
+    "category": "POI",
+    "type": "building",
+    "latitude": 31.250756,
+    "longitude": 75.704651,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786005753883",
+    "name": "corridor",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252029,
+    "longitude": 75.703778,
+    "isHidden": false
+  },
+  {
+    "id": "node-1786005796566",
+    "name": "Block 26",
+    "category": "POI",
+    "type": "building",
+    "latitude": 31.252678,
+    "longitude": 75.702851,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786005864168",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.25302,
+    "longitude": 75.703682,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786005936182",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.251864,
+    "longitude": 75.704394,
+    "isHidden": true
+  },
+  {
+    "id": "node-nav-1786005959331",
+    "name": "Road Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252206,
+    "longitude": 75.704385,
+    "isHidden": false
+  },
+  {
+    "id": "node-nav-1786005975248",
+    "name": "Merge Junction",
+    "category": "Navigation",
+    "type": "road_junction",
+    "latitude": 31.252304,
+    "longitude": 75.704067,
+    "isHidden": true
   }
 ]
