@@ -1,0 +1,478 @@
+[
+  {
+    "id": "node-1",
+    "name": "Main Gate",
+    "type": "gate",
+    "latitude": 31.2505,
+    "longitude": 75.701
+  },
+  {
+    "id": "node-2",
+    "name": "Uni Hospital",
+    "type": "hospital",
+    "latitude": 31.252,
+    "longitude": 75.7025
+  },
+  {
+    "id": "node-3",
+    "name": "Main Gate Intersection",
+    "type": "intersection",
+    "latitude": 31.251,
+    "longitude": 75.7015
+  },
+  {
+    "id": "node-4",
+    "name": "Central Library",
+    "type": "library",
+    "latitude": 31.253,
+    "longitude": 75.7042
+  },
+  {
+    "id": "node-5",
+    "name": "Food Court / Uni Mall",
+    "type": "food_court",
+    "latitude": 31.2535,
+    "longitude": 75.7035
+  },
+  {
+    "id": "node-6",
+    "name": "Main Roundabout",
+    "type": "roundabout",
+    "latitude": 31.2536,
+    "longitude": 75.7037
+  },
+  {
+    "id": "node-7",
+    "name": "Shanti Devi Mittal Auditorium",
+    "type": "auditorium",
+    "latitude": 31.2542,
+    "longitude": 75.705
+  },
+  {
+    "id": "node-8",
+    "name": "Baldev Raj Mittal Unipolis",
+    "type": "landmark",
+    "latitude": 31.254,
+    "longitude": 75.704
+  },
+  {
+    "id": "node-9",
+    "name": "Block 32",
+    "type": "building",
+    "latitude": 31.2545,
+    "longitude": 75.7028
+  },
+  {
+    "id": "node-10",
+    "name": "Block 33",
+    "type": "building",
+    "latitude": 31.2548,
+    "longitude": 75.7032
+  },
+  {
+    "id": "node-11",
+    "name": "Block 34",
+    "type": "building",
+    "latitude": 31.2552,
+    "longitude": 75.7036
+  },
+  {
+    "id": "node-12",
+    "name": "Robopark",
+    "type": "park",
+    "latitude": 31.255,
+    "longitude": 75.706
+  },
+  {
+    "id": "node-13",
+    "name": "Block 38",
+    "type": "building",
+    "latitude": 31.256,
+    "longitude": 75.7045
+  },
+  {
+    "id": "node-14",
+    "name": "Mall Road Intersection",
+    "type": "intersection",
+    "latitude": 31.2532,
+    "longitude": 75.703
+  },
+  {
+    "id": "node-15",
+    "name": "Block 34 North Intersection",
+    "type": "intersection",
+    "latitude": 31.2555,
+    "longitude": 75.7038
+  },
+  {
+    "id": "node-1785923073795",
+    "name": "Main Gate LPU",
+    "type": "entrance",
+    "latitude": 31.260623,
+    "longitude": 75.70676
+  },
+  {
+    "id": "node-1785923135510",
+    "name": "Hostel students entry/exit",
+    "type": "entrance",
+    "latitude": 31.260355,
+    "longitude": 75.707428
+  },
+  {
+    "id": "node-1785923156376",
+    "name": "Day Scholars entry/exit",
+    "type": "entrance",
+    "latitude": 31.260515,
+    "longitude": 75.70716
+  },
+  {
+    "id": "node-1785923198293",
+    "name": "Vehicles checkpoint",
+    "type": "road",
+    "latitude": 31.260066,
+    "longitude": 75.706618
+  },
+  {
+    "id": "node-1785923287944",
+    "name": "LPU Baldev Raj Mittal Park",
+    "type": "custom",
+    "latitude": 31.259034,
+    "longitude": 75.706916
+  },
+  {
+    "id": "node-1785923336991",
+    "name": "Uni Health Center",
+    "type": "hospital",
+    "latitude": 31.258018,
+    "longitude": 75.706822
+  },
+  {
+    "id": "node-1785923358741",
+    "name": "Sunken Ground",
+    "type": "custom",
+    "latitude": 31.258025,
+    "longitude": 75.707329
+  },
+  {
+    "id": "node-1785923410060",
+    "name": "Uni Auditorium",
+    "type": "building",
+    "latitude": 31.258289,
+    "longitude": 75.7079
+  },
+  {
+    "id": "node-1785923467725",
+    "name": "Underpass",
+    "type": "road",
+    "latitude": 31.257931,
+    "longitude": 75.706578
+  },
+  {
+    "id": "node-1785923488025",
+    "name": "Uni Hospital park",
+    "type": "custom",
+    "latitude": 31.257363,
+    "longitude": 75.706991
+  },
+  {
+    "id": "node-1785923521112",
+    "name": "Architecture Block",
+    "type": "building",
+    "latitude": 31.257048,
+    "longitude": 75.706854
+  },
+  {
+    "id": "node-1785923532845",
+    "name": "Fashion Block",
+    "type": "building",
+    "latitude": 31.25706,
+    "longitude": 75.707353
+  },
+  {
+    "id": "node-1785923593761",
+    "name": "Food Court (cc)",
+    "type": "food_court",
+    "latitude": 31.257812,
+    "longitude": 75.708195
+  },
+  {
+    "id": "node-1785923620026",
+    "name": "Product and Industrial Block",
+    "type": "building",
+    "latitude": 31.256601,
+    "longitude": 75.706752
+  },
+  {
+    "id": "node-1785923639575",
+    "name": "Nand Juice",
+    "type": "food_court",
+    "latitude": 31.256122,
+    "longitude": 75.706444
+  },
+  {
+    "id": "node-1785923658226",
+    "name": "Uni Mall",
+    "type": "building",
+    "latitude": 31.255829,
+    "longitude": 75.705317
+  },
+  {
+    "id": "node-1785923680826",
+    "name": "Lpu School of Hotel Management",
+    "type": "building",
+    "latitude": 31.255746,
+    "longitude": 75.704301
+  },
+  {
+    "id": "node-1785923734660",
+    "name": "Baldev Raj Mittal Uni Polis",
+    "type": "building",
+    "latitude": 31.254948,
+    "longitude": 75.704698
+  },
+  {
+    "id": "node-1785923855762",
+    "name": "Division of Student Relationship,",
+    "type": "building",
+    "latitude": 31.255,
+    "longitude": 75.706
+  },
+  {
+    "id": "node-1785923871144",
+    "name": "Block 14",
+    "type": "building",
+    "latitude": 31.254517,
+    "longitude": 75.705551
+  },
+  {
+    "id": "node-1785923899243",
+    "name": "Spider Park",
+    "type": "building",
+    "latitude": 31.254077,
+    "longitude": 75.705623
+  },
+  {
+    "id": "node-1785923930226",
+    "name": "LPU Main Parking",
+    "type": "parking",
+    "latitude": 31.253077,
+    "longitude": 75.705706
+  },
+  {
+    "id": "node-1785923946977",
+    "name": "LPU Main Parking",
+    "type": "parking",
+    "latitude": 31.25183,
+    "longitude": 75.705701
+  },
+  {
+    "id": "node-1785923989044",
+    "name": "LPU Innovation Studio, Block 39",
+    "type": "building",
+    "latitude": 31.251025,
+    "longitude": 75.705746
+  },
+  {
+    "id": "node-1785924160011",
+    "name": "Late Mrs. Mittal Samadhi",
+    "type": "custom",
+    "latitude": 31.253366,
+    "longitude": 75.70492
+  },
+  {
+    "id": "node-1785924234218",
+    "name": "Division Of Admission LPU, Block 30",
+    "type": "building",
+    "latitude": 31.252802,
+    "longitude": 75.704722
+  },
+  {
+    "id": "node-1785924252241",
+    "name": "Block 29",
+    "type": "building",
+    "latitude": 31.252694,
+    "longitude": 75.704113
+  },
+  {
+    "id": "node-1785924264061",
+    "name": "Block 28",
+    "type": "building",
+    "latitude": 31.252667,
+    "longitude": 75.703665
+  },
+  {
+    "id": "node-1785924270315",
+    "name": "Block 27",
+    "type": "building",
+    "latitude": 31.252678,
+    "longitude": 75.703247
+  },
+  {
+    "id": "node-1785924281067",
+    "name": "Block 26",
+    "type": "building",
+    "latitude": 31.252678,
+    "longitude": 75.70285
+  },
+  {
+    "id": "node-1785924288284",
+    "name": "Block 25",
+    "type": "building",
+    "latitude": 31.252701,
+    "longitude": 75.702418
+  },
+  {
+    "id": "node-1785924307733",
+    "name": "Open Auditorium",
+    "type": "custom",
+    "latitude": 31.252155,
+    "longitude": 75.704108
+  },
+  {
+    "id": "node-1785924344300",
+    "name": "Shanti Devi Mittal Auditorium",
+    "type": "building",
+    "latitude": 31.252123,
+    "longitude": 75.703713
+  },
+  {
+    "id": "node-1785924399734",
+    "name": "Block 38",
+    "type": "building",
+    "latitude": 31.252171,
+    "longitude": 75.70311
+  },
+  {
+    "id": "node-1785924408487",
+    "name": "Block 37",
+    "type": "building",
+    "latitude": 31.251853,
+    "longitude": 75.703585
+  },
+  {
+    "id": "node-1785924433851",
+    "name": "Block 36",
+    "type": "building",
+    "latitude": 31.251637,
+    "longitude": 75.704083
+  },
+  {
+    "id": "node-1785924444202",
+    "name": "Central Library",
+    "type": "building",
+    "latitude": 31.251905,
+    "longitude": 75.703649
+  },
+  {
+    "id": "node-1785924460201",
+    "name": "Block 32",
+    "type": "building",
+    "latitude": 31.252199,
+    "longitude": 75.704722
+  },
+  {
+    "id": "node-1785924467886",
+    "name": "Block 33",
+    "type": "building",
+    "latitude": 31.251855,
+    "longitude": 75.704692
+  },
+  {
+    "id": "node-1785924473502",
+    "name": "Block 34",
+    "type": "building",
+    "latitude": 31.251534,
+    "longitude": 75.704703
+  },
+  {
+    "id": "node-1785924502986",
+    "name": "34 Sitting Area",
+    "type": "custom",
+    "latitude": 31.251334,
+    "longitude": 75.704497
+  },
+  {
+    "id": "node-1785924515553",
+    "name": "34 Sitting Area",
+    "type": "building",
+    "latitude": 31.251238,
+    "longitude": 75.704687
+  },
+  {
+    "id": "node-1785924574387",
+    "name": "34 Food Court",
+    "type": "food_court",
+    "latitude": 31.250754,
+    "longitude": 75.704649
+  },
+  {
+    "id": "node-1785924613723",
+    "name": "Robo Park",
+    "type": "custom",
+    "latitude": 31.253499,
+    "longitude": 75.702882
+  },
+  {
+    "id": "node-1785924665386",
+    "name": "LPU Helipad",
+    "type": "custom",
+    "latitude": 31.254432,
+    "longitude": 75.702906
+  },
+  {
+    "id": "node-1785924711655",
+    "name": "Block 18",
+    "type": "building",
+    "latitude": 31.255253,
+    "longitude": 75.703349
+  },
+  {
+    "id": "node-1785924735455",
+    "name": "Girls Hostel 3",
+    "type": "building",
+    "latitude": 31.256195,
+    "longitude": 75.70425
+  },
+  {
+    "id": "node-1785924785255",
+    "name": "Girls Hostel 9,10",
+    "type": "building",
+    "latitude": 31.257622,
+    "longitude": 75.704655
+  },
+  {
+    "id": "node-1785924798222",
+    "name": "Girls Hostel 2",
+    "type": "building",
+    "latitude": 31.256753,
+    "longitude": 75.704671
+  },
+  {
+    "id": "node-1785924821523",
+    "name": "Girls Hostel 1",
+    "type": "building",
+    "latitude": 31.256886,
+    "longitude": 75.705304
+  },
+  {
+    "id": "node-1785924831856",
+    "name": "Security Office",
+    "type": "building",
+    "latitude": 31.256831,
+    "longitude": 75.705738
+  },
+  {
+    "id": "node-1785924861973",
+    "name": "Tungstile: GH 1,2,9,10",
+    "type": "building",
+    "latitude": 31.257046,
+    "longitude": 75.705709
+  },
+  {
+    "id": "node-1785924879156",
+    "name": "Girls Hostel 4",
+    "type": "building",
+    "latitude": 31.256493,
+    "longitude": 75.705685
+  }
+]
