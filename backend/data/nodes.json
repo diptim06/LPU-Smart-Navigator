@@ -249,7 +249,7 @@
     "latitude": 31.252667,
     "longitude": 75.703665,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924270315",
@@ -258,7 +258,7 @@
     "latitude": 31.252678,
     "longitude": 75.703247,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924281067",
@@ -267,7 +267,7 @@
     "latitude": 31.252678,
     "longitude": 75.70285,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924288284",
@@ -330,7 +330,7 @@
     "latitude": 31.251905,
     "longitude": 75.703649,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924460201",
@@ -339,7 +339,7 @@
     "latitude": 31.252199,
     "longitude": 75.704722,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924467886",
@@ -366,7 +366,7 @@
     "latitude": 31.251334,
     "longitude": 75.704497,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924515553",
@@ -384,7 +384,7 @@
     "latitude": 31.250754,
     "longitude": 75.704649,
     "category": "POI",
-    "isHidden": true
+    "isHidden": false
   },
   {
     "id": "node-1785924613723",

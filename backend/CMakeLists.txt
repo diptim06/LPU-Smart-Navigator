@@ -11,4 +11,7 @@ add_executable(lpu_smart_navigator_backend
     main.cpp
     src/Graph.cpp
     src/SearchIndex.cpp
+    src/DijkstraRouter.cpp
+    src/AStarRouter.cpp
+    src/RoutingManager.cpp
 )

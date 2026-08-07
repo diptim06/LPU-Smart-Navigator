@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import initialNodesData from '../../../backend/data/nodes.json'
 import { NavigationPanel } from './NavigationPanel'
+import type { RouteResult } from '../utils/dijkstraRouter'
 
 const LPU_COORDINATES: [number, number] = [31.2536, 75.7037]
 const INITIAL_ZOOM = 16
@@ -1111,21 +1112,30 @@ const loadInitialNodes = (): NodeItem[] => {
     if (saved) {
       const parsed = JSON.parse(saved)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((n: any) => ({
-          ...n,
-          category: n.category || 'POI',
-          isHidden: Boolean(n.isHidden),
-        })) as NodeItem[]
+        return parsed.map((n: any) => {
+          const category = n.category || (n.id.startsWith('node-nav-') ? 'Navigation' : 'POI')
+          // Auto-repair POIs incorrectly set to isHidden: true by previous merge operations
+          const isHidden = category === 'POI' ? false : Boolean(n.isHidden)
+          return {
+            ...n,
+            category,
+            isHidden,
+          }
+        }) as NodeItem[]
       }
     }
   } catch (e) {
     console.error('Failed to load nodes from localStorage:', e)
   }
-  return (initialNodesData as any[]).map((n) => ({
-    ...n,
-    category: n.category || 'POI',
-    isHidden: Boolean(n.isHidden),
-  })) as NodeItem[]
+  return (initialNodesData as any[]).map((n) => {
+    const category = n.category || (n.id.startsWith('node-nav-') ? 'Navigation' : 'POI')
+    const isHidden = category === 'POI' ? false : Boolean(n.isHidden)
+    return {
+      ...n,
+      category,
+      isHidden,
+    }
+  }) as NodeItem[]
 }
 
 const loadInitialEdges = (): EdgeItem[] => {
@@ -1172,6 +1182,10 @@ export const MapView = () => {
   // Snapping States
   const [hoveredSnap, setHoveredSnap] = useState<SnapProjection | null>(null)
   const [pendingSnapTarget, setPendingSnapTarget] = useState<{ location: ClickedLocation; snap: SnapProjection } | null>(null)
+  const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false)
+
+  // Route Visualization State (Sprint 8.3)
+  const [activeRouteResult, setActiveRouteResult] = useState<RouteResult | null>(null)
 
   const nodesMap = useMemo(() => {
     const map = new Map<string, NodeItem>()
@@ -1195,9 +1209,13 @@ export const MapView = () => {
     }
   }, [edges])
 
-  // Global Keyboard shortcuts: ESC to cancel drawing, Backspace / Ctrl+Z to undo last waypoint or delete selected waypoint
+  // Global Keyboard shortcuts: ESC to cancel drawing, Backspace / Ctrl+Z to undo last waypoint or delete selected waypoint, Shift for Smart Snap
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftPressed(true)
+      }
+
       const targetTag = (e.target as HTMLElement)?.tagName?.toUpperCase()
       if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') {
         return
@@ -1226,8 +1244,19 @@ export const MapView = () => {
       }
     }
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftPressed(false)
+        setHoveredSnap(null)
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
   }, [isPathMode, drawingWaypoints.length, editingGeometryEdge, selectedWaypointIndex])
 
   const resetPathDrawingState = () => {
@@ -1240,7 +1269,7 @@ export const MapView = () => {
   }
 
   const handleMouseMove = (location: ClickedLocation) => {
-    if (!isPathMode || !selectedStartNode || pendingSnapTarget) {
+    if (!isPathMode || !selectedStartNode || pendingSnapTarget || !isShiftPressed) {
       if (hoveredSnap) setHoveredSnap(null)
       return
     }
@@ -1279,7 +1308,7 @@ export const MapView = () => {
       setPendingSnapTarget(null)
     } else if (isPathMode) {
       if (drawStep === 'drawing_waypoints') {
-        if (hoveredSnap) {
+        if (isShiftPressed && hoveredSnap) {
           setPendingSnapTarget({ location, snap: hoveredSnap })
         } else {
           setDrawingWaypoints((prev) => [...prev, [location.lat, location.lng]])
@@ -1515,8 +1544,10 @@ export const MapView = () => {
     const snapLng = Number(snap.point[1].toFixed(6))
     const timestamp = Date.now()
 
+    // CRITICAL POI PRESERVATION FIX: Only search and reuse existing NAVIGATION nodes. NEVER reuse a POI node!
     const nearbyNavNode = nodes.find(
-      (n) => calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
+      (n) => (n.category === 'Navigation' || n.isHidden === true) &&
+             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
     )
 
     let connectNode: NodeItem
@@ -1567,10 +1598,41 @@ export const MapView = () => {
       isBidirectional: originalEdge.isBidirectional !== false,
     }
 
-    // Atomically persist replacement edges and incoming edge to edges state
+    // CRITICAL POI CONNECTIVITY: If a POI node is within 15 meters of the merge point, connect connectNode -> POI without modifying POI
+    const nearbyPoi = nodes.find(
+      (n) => !n.isHidden && n.category !== 'Navigation' &&
+             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
+    )
+
+    let poiConnectionEdge: EdgeItem | null = null
+    if (nearbyPoi) {
+      const isPoiConnected = edges.some(
+        (e) => (e.fromNodeId === connectNode.id && e.toNodeId === nearbyPoi.id) ||
+               (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
+      )
+      if (!isPoiConnected) {
+        const pDist = calculateDistanceMeters(connectNode.latitude, connectNode.longitude, nearbyPoi.latitude, nearbyPoi.longitude)
+        poiConnectionEdge = {
+          id: `edge-poi-conn-${timestamp}`,
+          fromNodeId: connectNode.id,
+          toNodeId: nearbyPoi.id,
+          geometry: [
+            [connectNode.latitude, connectNode.longitude],
+            [nearbyPoi.latitude, nearbyPoi.longitude],
+          ],
+          distance: Math.round(pDist * 10) / 10,
+          walkingTime: Math.round(pDist / 1.4),
+          pathType: 'walkway',
+          isBidirectional: true,
+        }
+      }
+    }
+
+    // Atomically persist replacement edges, incoming edge, and POI connection edge
     setEdges((prev) => {
       const filtered = isAlreadyConnected ? prev : prev.filter((e) => e.id !== originalEdge.id)
-      return [...filtered, ...newReplacementEdges, incomingEdge]
+      const toAdd = poiConnectionEdge ? [...newReplacementEdges, incomingEdge, poiConnectionEdge] : [...newReplacementEdges, incomingEdge]
+      return [...filtered, ...toAdd]
     })
 
     // Reset drawing state only AFTER incoming edge has been added to edges state
@@ -1586,8 +1648,10 @@ export const MapView = () => {
     const snapLng = Number(snap.point[1].toFixed(6))
     const timestamp = Date.now()
 
+    // CRITICAL POI PRESERVATION FIX: Only search and reuse existing NAVIGATION nodes. NEVER reuse a POI node!
     const nearbyNavNode = nodes.find(
-      (n) => calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
+      (n) => (n.category === 'Navigation' || n.isHidden === true) &&
+             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
     )
 
     let connectNode: NodeItem
@@ -1637,9 +1701,40 @@ export const MapView = () => {
       isBidirectional: originalEdge.isBidirectional !== false,
     }
 
+    // CRITICAL POI CONNECTIVITY: If a POI node is within 15 meters of the junction point, connect connectNode -> POI without modifying POI
+    const nearbyPoi = nodes.find(
+      (n) => !n.isHidden && n.category !== 'Navigation' &&
+             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
+    )
+
+    let poiConnectionEdge: EdgeItem | null = null
+    if (nearbyPoi) {
+      const isPoiConnected = edges.some(
+        (e) => (e.fromNodeId === connectNode.id && e.toNodeId === nearbyPoi.id) ||
+               (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
+      )
+      if (!isPoiConnected) {
+        const pDist = calculateDistanceMeters(connectNode.latitude, connectNode.longitude, nearbyPoi.latitude, nearbyPoi.longitude)
+        poiConnectionEdge = {
+          id: `edge-poi-conn-${timestamp}`,
+          fromNodeId: connectNode.id,
+          toNodeId: nearbyPoi.id,
+          geometry: [
+            [connectNode.latitude, connectNode.longitude],
+            [nearbyPoi.latitude, nearbyPoi.longitude],
+          ],
+          distance: Math.round(pDist * 10) / 10,
+          walkingTime: Math.round(pDist / 1.4),
+          pathType: 'walkway',
+          isBidirectional: true,
+        }
+      }
+    }
+
     setEdges((prev) => {
       const filtered = isAlreadyConnected ? prev : prev.filter((e) => e.id !== originalEdge.id)
-      return [...filtered, ...newReplacementEdges, incomingEdge]
+      const toAdd = poiConnectionEdge ? [...newReplacementEdges, incomingEdge, poiConnectionEdge] : [...newReplacementEdges, incomingEdge]
+      return [...filtered, ...toAdd]
     })
 
     resetPathDrawingState()
@@ -1783,8 +1878,12 @@ export const MapView = () => {
 
   return (
     <div className="relative h-screen w-screen m-0 p-0 overflow-hidden">
-      {/* Sprint 8.1: Search Engine Navigation Panel */}
-      <NavigationPanel nodes={nodes} />
+      {/* Sprint 8.1 & 8.3: Search Engine & Route Visualization Panel */}
+      <NavigationPanel
+        nodes={nodes}
+        edges={edges}
+        onRouteCalculated={(result) => setActiveRouteResult(result)}
+      />
 
       {/* Top Control Toolbar */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700/80 shadow-2xl text-white select-none">
@@ -1942,12 +2041,20 @@ export const MapView = () => {
               <span>
                 Start: <strong className="text-white">{selectedStartNode?.name}</strong>. Click map for waypoints ({drawingWaypoints.length} added).
                 <span className="text-slate-300 text-[11px] ml-2">(ESC: Cancel | Backspace/Ctrl+Z: Undo)</span>
-                {hoveredSnap && <span className="text-sky-300 ml-2 animate-pulse">🎯 Snapping active</span>}
+                {isShiftPressed ? (
+                  <span className="text-cyan-300 font-bold ml-2 animate-pulse bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/50">
+                    🧲 Smart Snap Enabled (Shift)
+                  </span>
+                ) : (
+                  <span className="text-amber-300/80 text-[11px] ml-2">
+                    💡 Hold Shift to Snap
+                  </span>
+                )}
               </span>
               <button
                 type="button"
                 onClick={() => setDrawStep('select_end')}
-                className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-2.5 py-1 rounded shadow"
+                className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-2.5 py-1 rounded shadow text-xs transition-colors"
               >
                 Finish Waypoints & Select End Node
               </button>
@@ -2012,6 +2119,55 @@ export const MapView = () => {
           maxZoom={MAX_ZOOM}
           maxNativeZoom={MAX_NATIVE_ZOOM}
         />
+
+        {/* Render Active Dijkstra Shortest Path Route (Prominent Blue Polyline - Sprint 8.3) */}
+        {activeRouteResult && activeRouteResult.found && activeRouteResult.geometry.length >= 2 && (
+          <Polyline
+            positions={activeRouteResult.geometry}
+            pathOptions={{
+              color: '#2563eb',
+              weight: 6,
+              opacity: 0.95,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+        )}
+
+        {/* Render Route Start and Destination Endpoint Markers */}
+        {activeRouteResult && activeRouteResult.found && activeRouteResult.geometry.length >= 1 && (
+          <>
+            <CircleMarker
+              center={activeRouteResult.geometry[0]}
+              radius={7}
+              pathOptions={{
+                color: '#1e40af',
+                fillColor: '#3b82f6',
+                fillOpacity: 1.0,
+                weight: 2,
+              }}
+            >
+              <Tooltip opacity={0.95} permanent direction="top" offset={[0, -6]}>
+                <span className="font-bold text-xs text-blue-900">🚩 Start</span>
+              </Tooltip>
+            </CircleMarker>
+
+            <CircleMarker
+              center={activeRouteResult.geometry[activeRouteResult.geometry.length - 1]}
+              radius={7}
+              pathOptions={{
+                color: '#065f46',
+                fillColor: '#10b981',
+                fillOpacity: 1.0,
+                weight: 2,
+              }}
+            >
+              <Tooltip opacity={0.95} permanent direction="top" offset={[0, -6]}>
+                <span className="font-bold text-xs text-emerald-900">🏁 Destination</span>
+              </Tooltip>
+            </CircleMarker>
+          </>
+        )}
 
         {/* Render Hovered Snap Edge Highlight */}
         {isPathMode && hoveredSnap && (

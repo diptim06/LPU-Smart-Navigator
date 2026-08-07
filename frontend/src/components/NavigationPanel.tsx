@@ -1,4 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
+import { type RouteResult, type EdgeItem } from '../utils/dijkstraRouter'
+import { findAStarRoute } from '../utils/aStarRouter'
 
 export interface NodeItem {
   id: string
@@ -12,7 +14,8 @@ export interface NodeItem {
 
 interface NavigationPanelProps {
   nodes: NodeItem[]
-  onSelectRouteNodes?: (startNodeId: string, destNodeId: string) => void
+  edges: EdgeItem[]
+  onRouteCalculated?: (result: RouteResult | null) => void
 }
 
 interface SearchableSelectProps {
@@ -134,10 +137,10 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
   )
 }
 
-export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelProps) => {
+export const NavigationPanel = ({ nodes, edges, onRouteCalculated }: NavigationPanelProps) => {
   const [startNodeId, setStartNodeId] = useState<string | null>(null)
   const [destNodeId, setDestNodeId] = useState<string | null>(null)
-  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [routeResult, setRouteResult] = useState<RouteResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Filter ONLY valid POI nodes (exclude category == 'Navigation' and isHidden == true)
@@ -145,9 +148,13 @@ export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelPr
     return nodes.filter((n) => !n.isHidden && n.category !== 'Navigation')
   }, [nodes])
 
+  const startNode = useMemo(() => nodes.find((n) => n.id === startNodeId), [nodes, startNodeId])
+  const destNode = useMemo(() => nodes.find((n) => n.id === destNodeId), [nodes, destNodeId])
+
   const handleNavigateClick = () => {
     setErrorMessage(null)
-    setStatusMessage(null)
+    setRouteResult(null)
+    if (onRouteCalculated) onRouteCalculated(null)
 
     if (!startNodeId) {
       setErrorMessage('Please select a Current Location.')
@@ -164,28 +171,36 @@ export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelPr
       return
     }
 
-    const startNode = nodes.find((n) => n.id === startNodeId)
-    const destNode = nodes.find((n) => n.id === destNodeId)
-
     if (!startNode || !destNode) {
       setErrorMessage('Selected locations could not be resolved.')
       return
     }
 
-    // Sprint 8.1 Specification: Log selected Start & Destination Nodes and Node IDs
     console.log('--------------------------------------------------')
-    console.log('NAVIGATION SELECTION LOGGED (Sprint 8.1)')
+    console.log('INVOKING ROUTING MANAGER (Sprint 8.4)')
     console.log('Selected Start Node:', startNode)
     console.log('Selected Destination Node:', destNode)
     console.log('Start Node ID:', startNode.id)
     console.log('Destination Node ID:', destNode.id)
     console.log('--------------------------------------------------')
 
-    setStatusMessage(`Ready for routing: ${startNode.name} ➔ ${destNode.name}`)
+    // Execute Primary Routing Engine (A* Search)
+    const result = findAStarRoute(nodes, edges, startNodeId, destNodeId)
 
-    if (onSelectRouteNodes) {
-      onSelectRouteNodes(startNode.id, destNode.id)
+    if (result.found) {
+      setRouteResult(result)
+      if (onRouteCalculated) onRouteCalculated(result)
+    } else {
+      setErrorMessage('No walking route could be found.')
+      setRouteResult(null)
+      if (onRouteCalculated) onRouteCalculated(null)
     }
+  }
+
+  const handleClearRoute = () => {
+    setRouteResult(null)
+    setErrorMessage(null)
+    if (onRouteCalculated) onRouteCalculated(null)
   }
 
   return (
@@ -193,7 +208,7 @@ export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelPr
       <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-          <h2 className="font-bold text-sm text-slate-100 tracking-wide">Route Finder</h2>
+          <h2 className="font-bold text-sm text-slate-100 tracking-wide">Campus Navigator</h2>
         </div>
         <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
           {poiOptions.length} POIs
@@ -208,7 +223,8 @@ export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelPr
         onSelectNode={(id) => {
           setStartNodeId(id)
           setErrorMessage(null)
-          setStatusMessage(null)
+          setRouteResult(null)
+          if (onRouteCalculated) onRouteCalculated(null)
         }}
       />
 
@@ -220,19 +236,66 @@ export const NavigationPanel = ({ nodes, onSelectRouteNodes }: NavigationPanelPr
         onSelectNode={(id) => {
           setDestNodeId(id)
           setErrorMessage(null)
-          setStatusMessage(null)
+          setRouteResult(null)
+          if (onRouteCalculated) onRouteCalculated(null)
         }}
       />
 
       {errorMessage && (
-        <div className="p-2 rounded-lg bg-rose-950/80 border border-rose-700/80 text-rose-200 text-xs font-medium animate-fadeIn">
+        <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700/80 text-rose-200 text-xs font-medium animate-fadeIn">
           ⚠️ {errorMessage}
         </div>
       )}
 
-      {statusMessage && (
-        <div className="p-2 rounded-lg bg-emerald-950/80 border border-emerald-700/80 text-emerald-200 text-xs font-medium animate-fadeIn">
-          ✅ {statusMessage}
+      {/* Floating Route Information Card */}
+      {routeResult && routeResult.found && startNode && destNode && (
+        <div className="p-3 bg-gradient-to-br from-indigo-950/90 to-blue-950/90 border border-indigo-500/50 rounded-xl space-y-2 shadow-xl animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-indigo-800/60 pb-1.5">
+            <span className="text-xs font-bold text-indigo-200 flex items-center space-x-1">
+              <span>🚶 Optimal Route Found</span>
+            </span>
+            <button
+              type="button"
+              onClick={handleClearRoute}
+              className="text-[10px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="space-y-1 text-xs">
+            <div className="truncate">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Start:</span>{' '}
+              <span className="font-bold text-white">{startNode.name}</span>
+            </div>
+            <div className="truncate">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Dest:</span>{' '}
+              <span className="font-bold text-white">{destNode.name}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-indigo-900/60 text-xs font-mono">
+            <div className="bg-slate-900/70 p-1.5 rounded-lg border border-indigo-900/50">
+              <div className="text-[9px] text-slate-400 uppercase font-sans">Total Distance</div>
+              <div className="text-indigo-300 font-bold text-sm">
+                {routeResult.totalDistance >= 1000
+                  ? `${(routeResult.totalDistance / 1000).toFixed(2)} km`
+                  : `${routeResult.totalDistance} m`}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/70 p-1.5 rounded-lg border border-indigo-900/50">
+              <div className="text-[9px] text-slate-400 uppercase font-sans">Est. Walk Time</div>
+              <div className="text-emerald-300 font-bold text-sm">
+                {Math.floor(routeResult.walkingTime / 60)}m {Math.round(routeResult.walkingTime % 60)}s
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-slate-400 pt-0.5 text-center font-mono">
+            Traversed: <span className="text-slate-200 font-semibold">{routeResult.nodeIds.length} nodes</span> •{' '}
+            <span className="text-slate-200 font-semibold">{routeResult.geometry.length} polyline points</span>
+          </div>
         </div>
       )}
 
