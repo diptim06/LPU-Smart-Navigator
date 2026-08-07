@@ -46,11 +46,23 @@ bool Graph::loadEdges(const std::string& filepath) {
         edgesList_ = SimpleJson::parseEdges(jsonStr);
 
         std::unordered_set<std::string> seenEdgeIds;
-        for (const auto& edge : edgesList_) {
+        for (auto& edge : edgesList_) {
             if (seenEdgeIds.find(edge.id) != seenEdgeIds.end()) {
                 validationErrors_.push_back("Validation Error: Duplicate Edge ID detected -> '" + edge.id + "'");
             } else {
                 seenEdgeIds.insert(edge.id);
+            }
+
+            // Ensure geometry is never empty (populate at least fromNode and toNode endpoints)
+            if (edge.geometry.empty() || edge.geometry.size() < 2) {
+                auto fromIt = nodesMap_.find(edge.fromNodeId);
+                auto toIt = nodesMap_.find(edge.toNodeId);
+                if (fromIt != nodesMap_.end() && toIt != nodesMap_.end()) {
+                    edge.geometry = {
+                        {fromIt->second.latitude, fromIt->second.longitude},
+                        {toIt->second.latitude, toIt->second.longitude}
+                    };
+                }
             }
         }
 
@@ -111,6 +123,7 @@ bool Graph::validateGraph() const {
 
     int missingNodeRefs = 0;
     int zeroLengthEdges = 0;
+    int longEdgeWarnings = 0;
     int invalidGeometries = 0;
     int orphanEdges = 0;
 
@@ -140,7 +153,12 @@ bool Graph::validateGraph() const {
             isValid = false;
         }
 
-        if (!edge.geometry.empty() && edge.geometry.size() < 2) {
+        if (edge.distance > 50.0) {
+            std::cout << "⚠️  Validation Warning: Edge '" << edge.id << "' (" << edge.fromNodeId << " -> " << edge.toNodeId << ") exceeds 50 meters (distance: " << std::fixed << std::setprecision(1) << edge.distance << "m). Consider adding intermediate waypoints/nodes for geometry precision." << std::endl;
+            longEdgeWarnings++;
+        }
+
+        if (edge.geometry.size() < 2) {
             std::cout << "⚠️  Validation Warning: Edge '" << edge.id << "' has invalid geometry (<2 points)." << std::endl;
             invalidGeometries++;
         }

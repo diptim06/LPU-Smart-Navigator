@@ -1,6 +1,7 @@
 #include "Graph.hpp"
 #include "SearchIndex.hpp"
 #include "RoutingManager.hpp"
+#include "HttpServer.hpp"
 #include <iostream>
 #include <iomanip>
 
@@ -89,36 +90,13 @@ int main() {
         "Tungstile Entrance ➔ Uni Health Center"
     );
 
-    // Route Test 2: Tungstile Entrance -> Park
-    runRoutingDemo(
-        routingManager,
-        campusGraph,
-        "node-1785994418803", // Tungstile
-        "node-1785923287944", // Park
-        "Tungstile Entrance ➔ Park"
-    );
-
-    // Route Test 3: Same Start and Destination Node
-    runRoutingDemo(
-        routingManager,
-        campusGraph,
-        "node-1785923336991",
-        "node-1785923336991",
-        "Same Start and Destination Node"
-    );
-
-    // Route Test 4: Invalid Start Node ID Failure Case
-    runRoutingDemo(
-        routingManager,
-        campusGraph,
-        "invalid-node-xyz",
-        "node-1786004471611",
-        "Invalid Start Node ID Failure Case"
-    );
-
     std::cout << "\n==================================================" << std::endl;
-    std::cout << "   HYBRID ROUTING ENGINE VERIFIED SUCCESSFULLY    " << std::endl;
+    std::cout << "  STARTING C++ BACKEND HTTP SERVER (SINGLE SOURCE) " << std::endl;
     std::cout << "==================================================" << std::endl;
+
+    // Start C++ HTTP Server on port 8080 (Sprint 8.6 with Hot Reloading)
+    HttpServer server(campusGraph, searchEngine, routingManager, 8080);
+    server.start();
 
     return 0;
 }

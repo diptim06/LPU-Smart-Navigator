@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import initialNodesData from '../../../backend/data/nodes.json'
 import { NavigationPanel } from './NavigationPanel'
 import type { RouteResult } from '../utils/dijkstraRouter'
+import { saveGraphToBackend } from '../utils/apiClient'
 
 const LPU_COORDINATES: [number, number] = [31.2536, 75.7037]
 const INITIAL_ZOOM = 16
@@ -14,6 +15,13 @@ const MAX_ZOOM = 22
 const MAX_NATIVE_ZOOM = 19
 const LOCAL_STORAGE_NODES_KEY = 'lpu_nodes_working_dataset'
 const LOCAL_STORAGE_EDGES_KEY = 'lpu_edges_working_dataset'
+const LOCAL_STORAGE_ADMIN_AUTH_KEY = 'lpu_admin_authenticated'
+
+// Demo authentication only. Replace with secure backend authentication for production.
+const ADMIN_CREDENTIALS = {
+  username: 'dips006',
+  password: '2222026',
+} as const
 
 const HOVER_SNAP_THRESHOLD_METERS = 12
 const NODE_REUSE_TOLERANCE_METERS = 3
@@ -1154,6 +1162,29 @@ const loadInitialEdges = (): EdgeItem[] => {
 }
 
 export const MapView = () => {
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_ADMIN_AUTH_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const [appMode, setAppMode] = useState<'user' | 'admin'>(() => {
+    try {
+      const isAuth = localStorage.getItem(LOCAL_STORAGE_ADMIN_AUTH_KEY) === 'true'
+      const saved = localStorage.getItem('lpu_app_mode')
+      return isAuth && saved === 'admin' ? 'admin' : 'user'
+    } catch {
+      return 'user'
+    }
+  })
+
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false)
+  const [loginUsername, setLoginUsername] = useState<string>('')
+  const [loginPassword, setLoginPassword] = useState<string>('')
+  const [loginError, setLoginError] = useState<string | null>(null)
+
   const [isNodeMode, setIsNodeMode] = useState<boolean>(false)
   const [isPathMode, setIsPathMode] = useState<boolean>(false)
   const [isInsertNavMode, setIsInsertNavMode] = useState<boolean>(false)
@@ -1186,6 +1217,33 @@ export const MapView = () => {
 
   // Route Visualization State (Sprint 8.3)
   const [activeRouteResult, setActiveRouteResult] = useState<RouteResult | null>(null)
+
+  // Save Graph Status State (Sprint 8.6)
+  const [isSavingGraph, setIsSavingGraph] = useState<boolean>(false)
+  const [saveStatusMessage, setSaveStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const handleSaveGraphToBackend = async () => {
+    setIsSavingGraph(true)
+    setSaveStatusMessage(null)
+    const res = await saveGraphToBackend(nodes, edges)
+    setIsSavingGraph(false)
+
+    if (res.success) {
+      setSaveStatusMessage({
+        type: 'success',
+        text: `✅ Graph saved & reloaded in C++ backend (${res.nodes} N, ${res.edges} E)`,
+      })
+    } else {
+      setSaveStatusMessage({
+        type: 'error',
+        text: `❌ ${res.error || 'Failed to save graph to backend'}`,
+      })
+    }
+
+    setTimeout(() => {
+      setSaveStatusMessage(null)
+    }, 4000)
+  }
 
   const nodesMap = useMemo(() => {
     const map = new Map<string, NodeItem>()
@@ -1268,6 +1326,68 @@ export const MapView = () => {
     setPendingSnapTarget(null)
   }
 
+  const handleModeToggle = (mode: 'user' | 'admin') => {
+    if (mode === 'admin' && !isAdminAuthenticated) {
+      handleOpenAdminLogin()
+      return
+    }
+
+    setAppMode(mode)
+    try {
+      localStorage.setItem('lpu_app_mode', mode)
+    } catch (e) {
+      console.error('Failed to save app mode:', e)
+    }
+    if (mode === 'user') {
+      setIsNodeMode(false)
+      setIsPathMode(false)
+      setIsInsertNavMode(false)
+      resetPathDrawingState()
+      setEditingNode(null)
+      setEditingEdge(null)
+      setEditingGeometryEdge(null)
+      setPendingNode(null)
+      setSplitTarget(null)
+      setPendingSnapTarget(null)
+    }
+  }
+
+  const handleOpenAdminLogin = () => {
+    if (isAdminAuthenticated) {
+      setAppMode('admin')
+      localStorage.setItem('lpu_app_mode', 'admin')
+    } else {
+      setLoginUsername('')
+      setLoginPassword('')
+      setLoginError(null)
+      setShowAdminLoginModal(true)
+    }
+  }
+
+  const handleAdminLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (
+      loginUsername === ADMIN_CREDENTIALS.username &&
+      loginPassword === ADMIN_CREDENTIALS.password
+    ) {
+      setIsAdminAuthenticated(true)
+      localStorage.setItem(LOCAL_STORAGE_ADMIN_AUTH_KEY, 'true')
+      localStorage.setItem('lpu_app_mode', 'admin')
+      setAppMode('admin')
+      setShowAdminLoginModal(false)
+      setLoginError(null)
+    } else {
+      setLoginError('❌ Invalid username or password.')
+    }
+  }
+
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false)
+    localStorage.setItem(LOCAL_STORAGE_ADMIN_AUTH_KEY, 'false')
+    localStorage.setItem('lpu_app_mode', 'user')
+    handleModeToggle('user')
+  }
+
   const handleMouseMove = (location: ClickedLocation) => {
     if (!isPathMode || !selectedStartNode || pendingSnapTarget || !isShiftPressed) {
       if (hoveredSnap) setHoveredSnap(null)
@@ -1295,6 +1415,8 @@ export const MapView = () => {
   }
 
   const handleMapClick = (location: ClickedLocation) => {
+    if (appMode === 'user') return
+
     if (editingGeometryEdge) {
       setSelectedWaypointIndex(null)
       return
@@ -1310,17 +1432,22 @@ export const MapView = () => {
       if (drawStep === 'drawing_waypoints') {
         if (isShiftPressed && hoveredSnap) {
           setPendingSnapTarget({ location, snap: hoveredSnap })
-        } else {
-          setDrawingWaypoints((prev) => [...prev, [location.lat, location.lng]])
+          return
         }
+        setDrawingWaypoints((prev) => [...prev, [Number(location.lat.toFixed(6)), Number(location.lng.toFixed(6))]])
       }
     } else {
       setClickedCoords(location)
+      setPendingNode(null)
+      setEditingNode(null)
+      setEditingEdge(null)
+      setSplitTarget(null)
+      setPendingSnapTarget(null)
     }
   }
 
   const handleNodeClick = (node: NodeItem) => {
-    if (editingGeometryEdge) return
+    if (appMode === 'user') return
 
     if (isPathMode) {
       if (drawStep === 'select_start') {
@@ -1812,16 +1939,34 @@ export const MapView = () => {
         const content = event.target?.result as string
         const parsed = JSON.parse(content)
         if (Array.isArray(parsed)) {
-          const validEdges = parsed.map((item: any) => ({
-            id: String(item.id || `edge-${Date.now()}`),
-            fromNodeId: String(item.fromNodeId || ''),
-            toNodeId: String(item.toNodeId || ''),
-            geometry: Array.isArray(item.geometry) ? item.geometry : [],
-            distance: Number(item.distance || 0),
-            walkingTime: Number(item.walkingTime || 0),
-            pathType: String(item.pathType || 'road'),
-            isBidirectional: item.isBidirectional !== false,
-          })) as EdgeItem[]
+          const nodesMapLocal = new Map<string, NodeItem>()
+          nodes.forEach((n) => nodesMapLocal.set(n.id, n))
+
+          const validEdges = parsed.map((item: any) => {
+            const fId = String(item.fromNodeId || '')
+            const tId = String(item.toNodeId || '')
+            const fn = nodesMapLocal.get(fId)
+            const tn = nodesMapLocal.get(tId)
+
+            let geom: [number, number][] = Array.isArray(item.geometry) ? item.geometry : []
+            if (geom.length < 2 && fn && tn) {
+              geom = [
+                [fn.latitude, fn.longitude],
+                [tn.latitude, tn.longitude],
+              ]
+            }
+
+            return {
+              id: String(item.id || `edge-${Date.now()}`),
+              fromNodeId: fId,
+              toNodeId: tId,
+              geometry: geom,
+              distance: Number(item.distance || 0),
+              walkingTime: Number(item.walkingTime || 0),
+              pathType: String(item.pathType || 'road'),
+              isBidirectional: item.isBidirectional !== false,
+            } as EdgeItem
+          })
 
           setEdges(validEdges)
           setEditingEdge(null)
@@ -1885,152 +2030,230 @@ export const MapView = () => {
         onRouteCalculated={(result) => setActiveRouteResult(result)}
       />
 
-      {/* Top Control Toolbar */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700/80 shadow-2xl text-white select-none">
-        {/* Node Collection Mode Toggle */}
+      {/* Top-Right Mode Switcher (User Mode vs Admin Mode - Sprint 9.0 & 9.1) */}
+      <div className="absolute top-4 right-4 z-[1100] bg-slate-900/90 text-white border border-slate-700/80 p-1.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center space-x-1 select-none font-sans">
         <button
           type="button"
-          onClick={() => {
-            setIsNodeMode(!isNodeMode)
-            if (!isNodeMode) {
-              setIsPathMode(false)
-              setIsInsertNavMode(false)
-              resetPathDrawingState()
-            }
-            setPendingNode(null)
-            setEditingNode(null)
-            setSplitTarget(null)
-          }}
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-            isNodeMode
-              ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-500'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          onClick={() => handleModeToggle('user')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            appMode === 'user'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              isNodeMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-            }`}
-          />
-          <span>Node Mode: {isNodeMode ? 'ON' : 'OFF'}</span>
+          <span>👤</span>
+          <span>User Mode</span>
         </button>
 
-        {/* Path Drawing Mode Toggle */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsPathMode(!isPathMode)
-            if (!isPathMode) {
-              setIsNodeMode(false)
-              setIsInsertNavMode(false)
-              resetPathDrawingState()
-            } else {
-              resetPathDrawingState()
-            }
-            setPendingNode(null)
-            setEditingNode(null)
-            setSplitTarget(null)
-          }}
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-            isPathMode
-              ? 'bg-amber-600 text-white shadow-md hover:bg-amber-500'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              isPathMode ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
-            }`}
-          />
-          <span>🖊 Path Drawing Mode: {isPathMode ? 'ON' : 'OFF'}</span>
-        </button>
+        {isAdminAuthenticated && appMode === 'admin' ? (
+          <div className="flex items-center space-x-1 pl-1">
+            <button
+              type="button"
+              onClick={() => handleModeToggle('admin')}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md shadow-amber-900/50 flex items-center space-x-1.5 cursor-default"
+            >
+              <span>👨‍💻</span>
+              <span>Admin Mode</span>
+            </button>
 
-        {/* Insert Navigation Node Mode Toggle */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsInsertNavMode(!isInsertNavMode)
-            if (!isInsertNavMode) {
-              setIsNodeMode(false)
-              setIsPathMode(false)
-              resetPathDrawingState()
-            }
-            setPendingNode(null)
-            setEditingNode(null)
-            setSplitTarget(null)
-          }}
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-            isInsertNavMode
-              ? 'bg-cyan-600 text-white shadow-md hover:bg-cyan-500'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              isInsertNavMode ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'
-            }`}
-          />
-          <span>📍 Insert Nav Node: {isInsertNavMode ? 'ON' : 'OFF'}</span>
-        </button>
-
-        <div className="h-4 w-px bg-slate-700 mx-0.5" />
-
-        {/* Import Nodes Button */}
-        <label className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-          </svg>
-          <span>Import Nodes</span>
-          <input type="file" accept=".json" onChange={handleImportNodes} className="hidden" />
-        </label>
-
-        {/* Export Nodes Button */}
-        <button
-          type="button"
-          onClick={handleExportNodes}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
-          </svg>
-          <span>Export Nodes ({nodes.length})</span>
-        </button>
-
-        <div className="h-4 w-px bg-slate-700 mx-0.5" />
-
-        {/* Import Edges Button */}
-        <label className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-          </svg>
-          <span>Import Edges</span>
-          <input type="file" accept=".json" onChange={handleImportEdges} className="hidden" />
-        </label>
-
-        {/* Export Edges Button */}
-        <button
-          type="button"
-          onClick={handleExportEdges}
-          className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
-          </svg>
-          <span>Export Edges ({edges.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleReloadOfficial}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors"
-          title="Reload official dataset from backend/data/nodes.json"
-        >
-          Reload Official
-        </button>
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-700/50 transition-colors cursor-pointer"
+              title="Logout from Admin session"
+            >
+              Logout 🚪
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleOpenAdminLogin}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-1.5 cursor-pointer"
+          >
+            <span>👨‍💻</span>
+            <span>Admin Login</span>
+          </button>
+        )}
       </div>
 
-      {/* Path Drawing Mode Guidance Banner */}
-      {isPathMode && (
+      {/* Top Control Toolbar (Admin Mode Only) */}
+      {appMode === 'admin' && (
+        <div className="absolute top-16 right-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700/80 shadow-2xl text-white select-none">
+          {/* Node Collection Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsNodeMode(!isNodeMode)
+              if (!isNodeMode) {
+                setIsPathMode(false)
+                setIsInsertNavMode(false)
+                resetPathDrawingState()
+              }
+              setPendingNode(null)
+              setEditingNode(null)
+              setSplitTarget(null)
+            }}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+              isNodeMode
+                ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-500'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isNodeMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <span>Node Mode: {isNodeMode ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Path Drawing Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsPathMode(!isPathMode)
+              if (!isPathMode) {
+                setIsNodeMode(false)
+                setIsInsertNavMode(false)
+                resetPathDrawingState()
+              } else {
+                resetPathDrawingState()
+              }
+              setPendingNode(null)
+              setEditingNode(null)
+              setSplitTarget(null)
+            }}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+              isPathMode
+                ? 'bg-amber-600 text-white shadow-md hover:bg-amber-500'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isPathMode ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <span>🖊 Path Drawing Mode: {isPathMode ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Insert Navigation Node Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsInsertNavMode(!isInsertNavMode)
+              if (!isInsertNavMode) {
+                setIsNodeMode(false)
+                setIsPathMode(false)
+                resetPathDrawingState()
+              }
+              setPendingNode(null)
+              setEditingNode(null)
+              setSplitTarget(null)
+            }}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+              isInsertNavMode
+                ? 'bg-cyan-600 text-white shadow-md hover:bg-cyan-500'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isInsertNavMode ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <span>📍 Insert Nav Node: {isInsertNavMode ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Primary Save Graph Button (Sprint 8.6) */}
+          <button
+            type="button"
+            onClick={handleSaveGraphToBackend}
+            disabled={isSavingGraph}
+            className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide shadow-lg shadow-emerald-950/40 transition-all flex items-center space-x-1.5 border border-emerald-400/40 cursor-pointer disabled:opacity-50"
+            title="Save graph directly into C++ backend data/ and hot reload engine in memory"
+          >
+            <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span>{isSavingGraph ? 'Saving...' : `💾 Save Graph (${nodes.length} N, ${edges.length} E)`}</span>
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          {/* Import Nodes Button */}
+          <label className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+            </svg>
+            <span>Import Nodes</span>
+            <input type="file" accept=".json" onChange={handleImportNodes} className="hidden" />
+          </label>
+
+          {/* Export Nodes Button (Debug Backup) */}
+          <button
+            type="button"
+            onClick={handleExportNodes}
+            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
+            title="Backup export of nodes.json"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
+            </svg>
+            <span>Export Nodes ({nodes.length})</span>
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          {/* Import Edges Button */}
+          <label className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+            </svg>
+            <span>Import Edges</span>
+            <input type="file" accept=".json" onChange={handleImportEdges} className="hidden" />
+          </label>
+
+          {/* Export Edges Button (Debug Backup) */}
+          <button
+            type="button"
+            onClick={handleExportEdges}
+            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
+            title="Backup export of edges.json"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
+            </svg>
+            <span>Export Edges ({edges.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleReloadOfficial}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors"
+            title="Reload official dataset from backend/data/nodes.json"
+          >
+            Reload Official
+          </button>
+        </div>
+      )}
+
+      {/* Save Graph Status Toast Banner (Sprint 8.6) */}
+      {saveStatusMessage && (
+        <div
+          className={`absolute top-20 left-1/2 -translate-x-1/2 z-[1100] px-5 py-2.5 rounded-xl shadow-2xl backdrop-blur-md text-xs font-bold border transition-all animate-bounce flex items-center space-x-2 select-none ${
+            saveStatusMessage.type === 'success'
+              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/60'
+              : 'bg-rose-950/90 text-rose-200 border-rose-500/60'
+          }`}
+        >
+          <span>{saveStatusMessage.text}</span>
+        </div>
+      )}
+
+      {/* Path Drawing Mode Guidance Banner (Admin Mode Only) */}
+      {appMode === 'admin' && isPathMode && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-amber-950/90 text-amber-200 border border-amber-600/60 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md text-xs font-medium flex items-center space-x-3 select-none">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
           {drawStep === 'select_start' && (
@@ -2068,16 +2291,16 @@ export const MapView = () => {
         </div>
       )}
 
-      {/* Insert Navigation Node Guidance Banner */}
-      {isInsertNavMode && (
+      {/* Insert Navigation Node Guidance Banner (Admin Mode Only) */}
+      {appMode === 'admin' && isInsertNavMode && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-cyan-950/90 text-cyan-200 border border-cyan-600/60 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md text-xs font-medium flex items-center space-x-2 select-none">
           <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
           <span>📍 Insert Nav Node Mode: Click anywhere along an existing path line to insert a Navigation Node and split the path.</span>
         </div>
       )}
 
-      {/* Geometry Editing Mode Guidance Banner */}
-      {editingGeometryEdge && (
+      {/* Geometry Editing Mode Guidance Banner (Admin Mode Only) */}
+      {appMode === 'admin' && editingGeometryEdge && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-amber-950/90 text-amber-200 border border-amber-600/60 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md text-xs font-medium flex items-center space-x-3 select-none">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
           <span>
@@ -2169,8 +2392,8 @@ export const MapView = () => {
           </>
         )}
 
-        {/* Render Hovered Snap Edge Highlight */}
-        {isPathMode && hoveredSnap && (
+        {/* Render Hovered Snap Edge Highlight (Admin Mode Only) */}
+        {appMode === 'admin' && isPathMode && hoveredSnap && (
           <Polyline
             positions={
               hoveredSnap.edge.geometry && hoveredSnap.edge.geometry.length >= 2
@@ -2188,8 +2411,8 @@ export const MapView = () => {
           />
         )}
 
-        {/* Render Hovered Snapping Point Indicator Dot */}
-        {isPathMode && hoveredSnap && (
+        {/* Render Hovered Snapping Point Indicator Dot (Admin Mode Only) */}
+        {appMode === 'admin' && isPathMode && hoveredSnap && (
           <CircleMarker
             center={hoveredSnap.point}
             radius={7}
@@ -2202,72 +2425,73 @@ export const MapView = () => {
           />
         )}
 
-        {/* Render Saved Edges (Polylines) */}
-        {edges.map((edge) => {
-          const fromNode = nodesMap.get(edge.fromNodeId)
-          const toNode = nodesMap.get(edge.toNodeId)
-          if (!fromNode || !toNode) return null
+        {/* Render Saved Edges Polylines (Admin Mode Only - User Mode hides raw graph lines for clean Google Maps look) */}
+        {appMode === 'admin' &&
+          edges.map((edge) => {
+            const fromNode = nodesMap.get(edge.fromNodeId)
+            const toNode = nodesMap.get(edge.toNodeId)
+            if (!fromNode || !toNode) return null
 
-          const polyGeometry: [number, number][] =
-            edge.geometry && edge.geometry.length >= 2
-              ? edge.geometry
-              : [
-                  [fromNode.latitude, fromNode.longitude],
-                  [toNode.latitude, toNode.longitude],
-                ]
+            const polyGeometry: [number, number][] =
+              edge.geometry && edge.geometry.length >= 2
+                ? edge.geometry
+                : [
+                    [fromNode.latitude, fromNode.longitude],
+                    [toNode.latitude, toNode.longitude],
+                  ]
 
-          const isBeingGeomEdited = editingGeometryEdge?.id === edge.id
+            const isBeingGeomEdited = editingGeometryEdge?.id === edge.id
 
-          return (
-            <Polyline
-              key={edge.id}
-              positions={polyGeometry}
-              pathOptions={{
-                color: isBeingGeomEdited ? '#f59e0b' : edge.isBidirectional ? '#4f46e5' : '#0284c7',
-                weight: isBeingGeomEdited ? 7 : 4,
-                opacity: isBeingGeomEdited ? 0.95 : 0.85,
-                dashArray: edge.isBidirectional ? undefined : '6, 6',
-              }}
-              eventHandlers={{
-                click: (e) => {
-                  e.originalEvent.stopPropagation()
-                  if (editingGeometryEdge) {
-                    if (editingGeometryEdge.id === edge.id) {
-                      handleInsertWaypointOnPolyline(e.latlng.lat, e.latlng.lng)
+            return (
+              <Polyline
+                key={edge.id}
+                positions={polyGeometry}
+                pathOptions={{
+                  color: isBeingGeomEdited ? '#f59e0b' : edge.isBidirectional ? '#4f46e5' : '#0284c7',
+                  weight: isBeingGeomEdited ? 7 : 4,
+                  opacity: isBeingGeomEdited ? 0.95 : 0.85,
+                  dashArray: edge.isBidirectional ? undefined : '6, 6',
+                }}
+                eventHandlers={{
+                  click: (e) => {
+                    e.originalEvent.stopPropagation()
+                    if (editingGeometryEdge) {
+                      if (editingGeometryEdge.id === edge.id) {
+                        handleInsertWaypointOnPolyline(e.latlng.lat, e.latlng.lng)
+                      }
+                      return
                     }
-                    return
-                  }
-                  if (isInsertNavMode) {
-                    setSplitTarget({
-                      location: { lat: e.latlng.lat, lng: e.latlng.lng },
-                      edge,
-                    })
-                    setEditingEdge(null)
-                  } else if (!isPathMode) {
-                    setEditingEdge(edge)
-                    setPendingNode(null)
-                    setEditingNode(null)
-                    resetPathDrawingState()
-                  }
-                },
-              }}
-            >
-              <Tooltip sticky opacity={0.95}>
-                <div className="font-sans text-xs">
-                  <div className="font-bold text-slate-900 capitalize">
-                    {edge.pathType} {edge.isBidirectional ? '(↔ Bidirectional)' : '(➔ One Way)'}
+                    if (isInsertNavMode) {
+                      setSplitTarget({
+                        location: { lat: e.latlng.lat, lng: e.latlng.lng },
+                        edge,
+                      })
+                      setEditingEdge(null)
+                    } else if (!isPathMode) {
+                      setEditingEdge(edge)
+                      setPendingNode(null)
+                      setEditingNode(null)
+                      resetPathDrawingState()
+                    }
+                  },
+                }}
+              >
+                <Tooltip sticky opacity={0.95}>
+                  <div className="font-sans text-xs">
+                    <div className="font-bold text-slate-900 capitalize">
+                      {edge.pathType} {edge.isBidirectional ? '(↔ Bidirectional)' : '(➔ One Way)'}
+                    </div>
+                    <div className="text-[10px] text-indigo-600 font-medium">
+                      {fromNode.name} ➔ {toNode.name}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      Dist: {edge.distance}m | Time: {edge.walkingTime}s | Points: {polyGeometry.length}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-indigo-600 font-medium">
-                    {fromNode.name} ➔ {toNode.name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    Dist: {edge.distance}m | Time: {edge.walkingTime}s | Points: {polyGeometry.length}
-                  </div>
-                </div>
-              </Tooltip>
-            </Polyline>
-          )
-        })}
+                </Tooltip>
+              </Polyline>
+            )
+          })}
 
         {/* Edit Geometry Mode Interactive Waypoint Markers */}
         {editingGeometryEdge &&
@@ -2358,9 +2582,10 @@ export const MapView = () => {
             />
           ))}
 
-        {/* Render Visible Nodes (CircleMarkers) - Exclude Hidden Nodes */}
+        {/* Render Visible Nodes (CircleMarkers) - Exclude Hidden and Navigation nodes in User Mode */}
         {nodes.map((node) => {
-          if (node.isHidden) return null // Do NOT render hidden navigation nodes on map
+          if (node.isHidden) return null
+          if (appMode === 'user' && node.category === 'Navigation') return null
 
           const isSelectedStart = selectedStartNode?.id === node.id
           const isSelectedEnd = selectedEndNode?.id === node.id
@@ -2403,8 +2628,8 @@ export const MapView = () => {
           )
         })}
 
-        {/* Popup form for creating new node */}
-        {isNodeMode && pendingNode && (
+        {/* Popup form for creating new node (Admin Mode Only) */}
+        {appMode === 'admin' && isNodeMode && pendingNode && (
           <Popup
             position={[pendingNode.lat, pendingNode.lng]}
             eventHandlers={{
@@ -2419,8 +2644,8 @@ export const MapView = () => {
           </Popup>
         )}
 
-        {/* Popup form for editing existing node */}
-        {editingNode && (
+        {/* Popup form for editing existing node (Admin Mode Only) */}
+        {appMode === 'admin' && editingNode && (
           <Popup
             position={[editingNode.latitude, editingNode.longitude]}
             eventHandlers={{
@@ -2436,8 +2661,8 @@ export const MapView = () => {
           </Popup>
         )}
 
-        {/* Popup form for snapping action decision */}
-        {pendingSnapTarget && (
+        {/* Popup form for snapping action decision (Admin Mode Only) */}
+        {appMode === 'admin' && pendingSnapTarget && (
           <Popup
             position={pendingSnapTarget.snap.point}
             eventHandlers={{
@@ -2456,8 +2681,8 @@ export const MapView = () => {
           </Popup>
         )}
 
-        {/* Popup form for inserting Navigation Node on path */}
-        {splitTarget && (
+        {/* Popup form for inserting Navigation Node on path (Admin Mode Only) */}
+        {appMode === 'admin' && splitTarget && (
           <Popup
             position={[splitTarget.location.lat, splitTarget.location.lng]}
             eventHandlers={{
@@ -2474,8 +2699,8 @@ export const MapView = () => {
           </Popup>
         )}
 
-        {/* Popup form for adding new drawn path */}
-        {selectedStartNode && selectedEndNode && activeDrawingGeometry.length >= 2 && (
+        {/* Popup form for adding new drawn path (Admin Mode Only) */}
+        {appMode === 'admin' && selectedStartNode && selectedEndNode && activeDrawingGeometry.length >= 2 && (
           <Popup
             position={getGeometryCenter(activeDrawingGeometry)}
             eventHandlers={{
@@ -2492,8 +2717,8 @@ export const MapView = () => {
           </Popup>
         )}
 
-        {/* Popup form for editing existing edge */}
-        {editingEdge && (
+        {/* Popup form for editing existing edge (Admin Mode Only) */}
+        {appMode === 'admin' && editingEdge && (
           <Popup
             position={getGeometryCenter(
               editingEdge.geometry && editingEdge.geometry.length >= 2
@@ -2537,6 +2762,81 @@ export const MapView = () => {
           </div>
           <div>
             <span className="text-indigo-400 font-semibold">Lng:</span> {clickedCoords.lng.toFixed(6)}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Login Modal (Sprint 9.1) */}
+      {showAdminLoginModal && (
+        <div className="fixed inset-0 z-[2000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans select-none animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-sm rounded-2xl shadow-2xl p-6 text-white space-y-4 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🔐</span>
+                <h3 className="font-bold text-base text-slate-100">Admin Login</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminLoginModal(false)}
+                className="text-slate-400 hover:text-white transition-colors text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {loginError && (
+              <div className="bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs font-semibold px-3 py-2 rounded-lg animate-shake">
+                {loginError}
+              </div>
+            )}
+
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-3.5">
+              <div>
+                <label htmlFor="admin-username" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Username
+                </label>
+                <input
+                  id="admin-username"
+                  type="text"
+                  required
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  placeholder="Enter admin username"
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="admin-password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Password
+                </label>
+                <input
+                  id="admin-password"
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminLoginModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs text-white bg-amber-600 hover:bg-amber-500 rounded-lg font-bold shadow-md shadow-amber-950/50 transition-colors"
+                >
+                  Login
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

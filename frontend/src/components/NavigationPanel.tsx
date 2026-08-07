@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { type RouteResult, type EdgeItem } from '../utils/dijkstraRouter'
 import { findAStarRoute } from '../utils/aStarRouter'
+import { fetchRouteFromBackend } from '../utils/apiClient'
 
 export interface NodeItem {
   id: string
@@ -143,15 +144,37 @@ export const NavigationPanel = ({ nodes, edges, onRouteCalculated }: NavigationP
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Filter ONLY valid POI nodes (exclude category == 'Navigation' and isHidden == true)
+  // Filter ONLY valid POI nodes, deduplicating by name and prioritizing connected nodes over isolated duplicates
   const poiOptions = useMemo(() => {
-    return nodes.filter((n) => !n.isHidden && n.category !== 'Navigation')
-  }, [nodes])
+    const nodeDegrees = new Map<string, number>()
+    nodes.forEach((n) => nodeDegrees.set(n.id, 0))
+    edges.forEach((e) => {
+      nodeDegrees.set(e.fromNodeId, (nodeDegrees.get(e.fromNodeId) || 0) + 1)
+      nodeDegrees.set(e.toNodeId, (nodeDegrees.get(e.toNodeId) || 0) + 1)
+    })
+
+    const validPois = nodes.filter((n) => !n.isHidden && n.category !== 'Navigation')
+    const bestPoisMap = new Map<string, NodeItem>()
+    const bestDegreeMap = new Map<string, number>()
+
+    validPois.forEach((n) => {
+      const lowerName = n.name.toLowerCase().trim()
+      const deg = nodeDegrees.get(n.id) || 0
+      const existingDeg = bestDegreeMap.get(lowerName)
+
+      if (!bestPoisMap.has(lowerName) || (existingDeg !== undefined && deg > existingDeg)) {
+        bestPoisMap.set(lowerName, n)
+        bestDegreeMap.set(lowerName, deg)
+      }
+    })
+
+    return Array.from(bestPoisMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [nodes, edges])
 
   const startNode = useMemo(() => nodes.find((n) => n.id === startNodeId), [nodes, startNodeId])
   const destNode = useMemo(() => nodes.find((n) => n.id === destNodeId), [nodes, destNodeId])
 
-  const handleNavigateClick = () => {
+  const handleNavigateClick = async () => {
     setErrorMessage(null)
     setRouteResult(null)
     if (onRouteCalculated) onRouteCalculated(null)
@@ -177,23 +200,38 @@ export const NavigationPanel = ({ nodes, edges, onRouteCalculated }: NavigationP
     }
 
     console.log('--------------------------------------------------')
-    console.log('INVOKING ROUTING MANAGER (Sprint 8.4)')
-    console.log('Selected Start Node:', startNode)
-    console.log('Selected Destination Node:', destNode)
-    console.log('Start Node ID:', startNode.id)
-    console.log('Destination Node ID:', destNode.id)
+    console.log('SENDING REQUEST TO C++ BACKEND ROUTING MANAGER (Sprint 8.5)')
+    console.log('Start Node ID:', startNodeId, `(${startNode.name})`)
+    console.log('Destination Node ID:', destNodeId, `(${destNode.name})`)
+    console.log('Endpoint: POST http://localhost:8080/api/route')
     console.log('--------------------------------------------------')
 
-    // Execute Primary Routing Engine (A* Search)
-    const result = findAStarRoute(nodes, edges, startNodeId, destNodeId)
+    try {
+      // Sprint 8.5: C++ Backend RoutingManager is the SINGLE SOURCE OF TRUTH
+      const result = await fetchRouteFromBackend(startNodeId, destNodeId)
 
-    if (result.found) {
-      setRouteResult(result)
-      if (onRouteCalculated) onRouteCalculated(result)
-    } else {
-      setErrorMessage('No walking route could be found.')
-      setRouteResult(null)
-      if (onRouteCalculated) onRouteCalculated(null)
+      console.log('[C++ Backend Response Received]:', result)
+
+      if (result.found) {
+        setRouteResult(result)
+        if (onRouteCalculated) onRouteCalculated(result)
+      } else {
+        setErrorMessage('No walking route could be found.')
+        setRouteResult(null)
+        if (onRouteCalculated) onRouteCalculated(null)
+      }
+    } catch (err) {
+      console.warn('⚠️ C++ Backend API Server offline, executing client fallback:', err)
+      // Fallback debug execution if backend HTTP server is offline
+      const fallbackResult = findAStarRoute(nodes, edges, startNodeId, destNodeId)
+      if (fallbackResult.found) {
+        setRouteResult(fallbackResult)
+        if (onRouteCalculated) onRouteCalculated(fallbackResult)
+      } else {
+        setErrorMessage('No walking route could be found.')
+        setRouteResult(null)
+        if (onRouteCalculated) onRouteCalculated(null)
+      }
     }
   }
 
