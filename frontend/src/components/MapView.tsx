@@ -1180,6 +1180,27 @@ export const MapView = () => {
     }
   })
 
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('lpu_admin_sidebar_expanded')
+      return saved !== null ? saved === 'true' : true
+    } catch {
+      return true
+    }
+  })
+
+  const toggleSidebar = () => {
+    setIsSidebarExpanded((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('lpu_admin_sidebar_expanded', String(next))
+      } catch (e) {
+        console.error('Failed to save sidebar state:', e)
+      }
+      return next
+    })
+  }
+
   const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false)
   const [loginUsername, setLoginUsername] = useState<string>('')
   const [loginPassword, setLoginPassword] = useState<string>('')
@@ -2023,219 +2044,307 @@ export const MapView = () => {
 
   return (
     <div className="relative h-screen w-screen m-0 p-0 overflow-hidden">
-      {/* Sprint 8.1 & 8.3: Search Engine & Route Visualization Panel */}
+      {/* Sprint 8.1, 8.3 & 9.4.1: Unified Responsive Top Header Panel */}
       <NavigationPanel
         nodes={nodes}
         edges={edges}
+        appMode={appMode}
+        isAdminAuthenticated={isAdminAuthenticated}
+        isSidebarExpanded={isSidebarExpanded}
+        onModeToggle={handleModeToggle}
+        onOpenAdminLogin={handleOpenAdminLogin}
+        onAdminLogout={handleAdminLogout}
         onRouteCalculated={(result) => setActiveRouteResult(result)}
       />
 
-      {/* Top-Right Mode Switcher (User Mode vs Admin Mode - Sprint 9.0 & 9.1) */}
-      <div className="absolute top-4 right-4 z-[1100] bg-slate-900/90 text-white border border-slate-700/80 p-1.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center space-x-1 select-none font-sans">
-        <button
-          type="button"
-          onClick={() => handleModeToggle('user')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-            appMode === 'user'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+      {/* Admin Mode Collapsible Left Sidebar (Sprint 9.2) */}
+      {appMode === 'admin' && (
+        <div
+          className={`absolute top-4 left-4 z-[1100] max-h-[calc(100vh-2rem)] bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-md transition-all duration-300 flex flex-col overflow-hidden select-none font-sans ${
+            isSidebarExpanded ? 'w-72' : 'w-16'
           }`}
         >
-          <span>👤</span>
-          <span>User Mode</span>
-        </button>
-
-        {isAdminAuthenticated && appMode === 'admin' ? (
-          <div className="flex items-center space-x-1 pl-1">
+          {/* Sidebar Header & Toggle */}
+          <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
             <button
               type="button"
-              onClick={() => handleModeToggle('admin')}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md shadow-amber-900/50 flex items-center space-x-1.5 cursor-default"
+              onClick={toggleSidebar}
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+              title={isSidebarExpanded ? 'Collapse Sidebar' : 'Expand Sidebar'}
             >
-              <span>👨‍💻</span>
-              <span>Admin Mode</span>
+              <span className="text-lg leading-none">☰</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleAdminLogout}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-700/50 transition-colors cursor-pointer"
-              title="Logout from Admin session"
-            >
-              Logout 🚪
-            </button>
+            {isSidebarExpanded && (
+              <div className="flex items-center space-x-1.5 font-bold text-sm text-slate-100 pr-1">
+                <span>⚡</span>
+                <span>Admin Suite</span>
+              </div>
+            )}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleOpenAdminLogin}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-1.5 cursor-pointer"
-          >
-            <span>👨‍💻</span>
-            <span>Admin Login</span>
-          </button>
-        )}
-      </div>
 
-      {/* Top Control Toolbar (Admin Mode Only) */}
-      {appMode === 'admin' && (
-        <div className="absolute top-16 right-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-700/80 shadow-2xl text-white select-none">
-          {/* Node Collection Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsNodeMode(!isNodeMode)
-              if (!isNodeMode) {
-                setIsPathMode(false)
-                setIsInsertNavMode(false)
-                resetPathDrawingState()
-              }
-              setPendingNode(null)
-              setEditingNode(null)
-              setSplitTarget(null)
-            }}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-              isNodeMode
-                ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-500'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isNodeMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-              }`}
-            />
-            <span>Node Mode: {isNodeMode ? 'ON' : 'OFF'}</span>
-          </button>
+          {/* Scrollable Sidebar Body */}
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-4 text-xs scrollbar-thin scrollbar-thumb-slate-700">
+            {/* Section 1: GRAPH */}
+            <div>
+              {isSidebarExpanded ? (
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center space-x-1">
+                  <span>📍</span>
+                  <span>GRAPH</span>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 mb-1 text-[10px]">📍</div>
+              )}
 
-          {/* Path Drawing Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsPathMode(!isPathMode)
-              if (!isPathMode) {
-                setIsNodeMode(false)
-                setIsInsertNavMode(false)
-                resetPathDrawingState()
-              } else {
-                resetPathDrawingState()
-              }
-              setPendingNode(null)
-              setEditingNode(null)
-              setSplitTarget(null)
-            }}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-              isPathMode
-                ? 'bg-amber-600 text-white shadow-md hover:bg-amber-500'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isPathMode ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
-              }`}
-            />
-            <span>🖊 Path Drawing Mode: {isPathMode ? 'ON' : 'OFF'}</span>
-          </button>
+              <div className="space-y-1.5">
+                {/* Node Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNodeMode(!isNodeMode)
+                    if (!isNodeMode) {
+                      setIsPathMode(false)
+                      setIsInsertNavMode(false)
+                      resetPathDrawingState()
+                    }
+                    setPendingNode(null)
+                    setEditingNode(null)
+                    setSplitTarget(null)
+                  }}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                  } py-2 rounded-xl text-xs font-semibold transition-all ${
+                    isNodeMode
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title="Draw Node Mode"
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isNodeMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                  {isSidebarExpanded && <span>Draw Node: {isNodeMode ? 'ON' : 'OFF'}</span>}
+                </button>
 
-          {/* Insert Navigation Node Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsInsertNavMode(!isInsertNavMode)
-              if (!isInsertNavMode) {
-                setIsNodeMode(false)
-                setIsPathMode(false)
-                resetPathDrawingState()
-              }
-              setPendingNode(null)
-              setEditingNode(null)
-              setSplitTarget(null)
-            }}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-              isInsertNavMode
-                ? 'bg-cyan-600 text-white shadow-md hover:bg-cyan-500'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isInsertNavMode ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'
-              }`}
-            />
-            <span>📍 Insert Nav Node: {isInsertNavMode ? 'ON' : 'OFF'}</span>
-          </button>
+                {/* Path Drawing Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPathMode(!isPathMode)
+                    if (!isPathMode) {
+                      setIsNodeMode(false)
+                      setIsInsertNavMode(false)
+                      resetPathDrawingState()
+                    } else {
+                      resetPathDrawingState()
+                    }
+                    setPendingNode(null)
+                    setEditingNode(null)
+                    setSplitTarget(null)
+                  }}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                  } py-2 rounded-xl text-xs font-semibold transition-all ${
+                    isPathMode
+                      ? 'bg-amber-600 text-white shadow-md shadow-amber-900/50'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title="Path Drawing Mode"
+                >
+                  <span className="text-sm shrink-0">🖊</span>
+                  {isSidebarExpanded && <span>Draw Path: {isPathMode ? 'ON' : 'OFF'}</span>}
+                </button>
 
-          {/* Primary Save Graph Button (Sprint 8.6) */}
-          <button
-            type="button"
-            onClick={handleSaveGraphToBackend}
-            disabled={isSavingGraph}
-            className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide shadow-lg shadow-emerald-950/40 transition-all flex items-center space-x-1.5 border border-emerald-400/40 cursor-pointer disabled:opacity-50"
-            title="Save graph directly into C++ backend data/ and hot reload engine in memory"
-          >
-            <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            <span>{isSavingGraph ? 'Saving...' : `💾 Save Graph (${nodes.length} N, ${edges.length} E)`}</span>
-          </button>
+                {/* Insert Nav Node Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsInsertNavMode(!isInsertNavMode)
+                    if (!isInsertNavMode) {
+                      setIsNodeMode(false)
+                      setIsPathMode(false)
+                      resetPathDrawingState()
+                    }
+                    setPendingNode(null)
+                    setEditingNode(null)
+                    setSplitTarget(null)
+                  }}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                  } py-2 rounded-xl text-xs font-semibold transition-all ${
+                    isInsertNavMode
+                      ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/50'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title="Insert Navigation Node Mode"
+                >
+                  <span className="text-sm shrink-0">📍</span>
+                  {isSidebarExpanded && <span>Insert Nav Node: {isInsertNavMode ? 'ON' : 'OFF'}</span>}
+                </button>
+              </div>
+            </div>
 
-          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+            {/* Section 2: PATH EDITING (Status Info) */}
+            {(isPathMode || editingGeometryEdge || splitTarget) && (
+              <div className="border-t border-slate-800/80 pt-3">
+                {isSidebarExpanded ? (
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center space-x-1">
+                    <span>🛣</span>
+                    <span>PATH EDITING</span>
+                  </div>
+                ) : (
+                  <div className="text-center text-slate-500 mb-1 text-[10px]">🛣</div>
+                )}
+                <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                  {isPathMode && <div>• Drawing waypoints ({drawingWaypoints.length})</div>}
+                  {editingGeometryEdge && <div>• Reshaping path geometry</div>}
+                  {splitTarget && <div>• Splitting path at junction</div>}
+                </div>
+              </div>
+            )}
 
-          {/* Import Nodes Button */}
-          <label className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-            </svg>
-            <span>Import Nodes</span>
-            <input type="file" accept=".json" onChange={handleImportNodes} className="hidden" />
-          </label>
+            {/* Section 3: DATASET */}
+            <div className="border-t border-slate-800/80 pt-3">
+              {isSidebarExpanded ? (
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center space-x-1">
+                  <span>💾</span>
+                  <span>DATASET</span>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 mb-1 text-[10px]">💾</div>
+              )}
 
-          {/* Export Nodes Button (Debug Backup) */}
-          <button
-            type="button"
-            onClick={handleExportNodes}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
-            title="Backup export of nodes.json"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
-            </svg>
-            <span>Export Nodes ({nodes.length})</span>
-          </button>
+              <div className="space-y-1.5">
+                {/* Primary Save Graph Button */}
+                <button
+                  type="button"
+                  onClick={handleSaveGraphToBackend}
+                  disabled={isSavingGraph}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer disabled:opacity-50`}
+                  title="Save graph directly to C++ backend"
+                >
+                  <span className="text-sm shrink-0">💾</span>
+                  {isSidebarExpanded && <span>{isSavingGraph ? 'Saving...' : `Save Graph`}</span>}
+                </button>
 
-          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+                {/* Import Nodes */}
+                <label
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  title="Import Nodes JSON"
+                >
+                  <span className="text-sm shrink-0">📥</span>
+                  {isSidebarExpanded && <span>Import Nodes</span>}
+                  <input type="file" accept=".json" onChange={handleImportNodes} className="hidden" />
+                </label>
 
-          {/* Import Edges Button */}
-          <label className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1 cursor-pointer">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-            </svg>
-            <span>Import Edges</span>
-            <input type="file" accept=".json" onChange={handleImportEdges} className="hidden" />
-          </label>
+                {/* Export Nodes */}
+                <button
+                  type="button"
+                  onClick={handleExportNodes}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  title="Export Nodes JSON"
+                >
+                  <span className="text-sm shrink-0">📤</span>
+                  {isSidebarExpanded && <span>Export Nodes</span>}
+                </button>
 
-          {/* Export Edges Button (Debug Backup) */}
-          <button
-            type="button"
-            onClick={handleExportEdges}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide shadow-md transition-colors flex items-center space-x-1"
-            title="Backup export of edges.json"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" />
-            </svg>
-            <span>Export Edges ({edges.length})</span>
-          </button>
+                {/* Import Edges */}
+                <label
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  title="Import Edges JSON"
+                >
+                  <span className="text-sm shrink-0">📥</span>
+                  {isSidebarExpanded && <span>Import Edges</span>}
+                  <input type="file" accept=".json" onChange={handleImportEdges} className="hidden" />
+                </label>
 
-          <button
-            type="button"
-            onClick={handleReloadOfficial}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors"
-            title="Reload official dataset from backend/data/nodes.json"
-          >
-            Reload Official
-          </button>
+                {/* Export Edges */}
+                <button
+                  type="button"
+                  onClick={handleExportEdges}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  title="Export Edges JSON"
+                >
+                  <span className="text-sm shrink-0">📤</span>
+                  {isSidebarExpanded && <span>Export Edges</span>}
+                </button>
+
+                {/* Reload Official */}
+                <button
+                  type="button"
+                  onClick={handleReloadOfficial}
+                  className={`w-full flex items-center ${
+                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer`}
+                  title="Reload Official Dataset"
+                >
+                  <span className="text-sm shrink-0">🔄</span>
+                  {isSidebarExpanded && <span>Reload Official</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Section 4: TOOLS / STATISTICS */}
+            <div className="border-t border-slate-800/80 pt-3">
+              {isSidebarExpanded ? (
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center space-x-1">
+                  <span>📊</span>
+                  <span>TOOLS & STATS</span>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 mb-1 text-[10px]">📊</div>
+              )}
+
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 space-y-1 text-slate-300 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Total Nodes:</span>
+                  <span className="font-mono font-bold text-indigo-400">{nodes.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Total Edges:</span>
+                  <span className="font-mono font-bold text-cyan-400">{edges.length}</span>
+                </div>
+                {isSidebarExpanded && (
+                  <div className="flex justify-between pt-1 border-t border-slate-800 text-[10px] text-slate-400">
+                    <span>Engine Status:</span>
+                    <span className="text-emerald-400 font-bold">C++ 1.0 Ready</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 5: ADMIN & LOGOUT */}
+            <div className="border-t border-slate-800/80 pt-3">
+              {isSidebarExpanded ? (
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center space-x-1">
+                  <span>⚙</span>
+                  <span>ADMIN</span>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 mb-1 text-[10px]">⚙</div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleAdminLogout}
+                className={`w-full flex items-center ${
+                  isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                } py-2 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/60 transition-all cursor-pointer`}
+                title="Logout from Admin session"
+              >
+                <span className="text-sm shrink-0">🚪</span>
+                {isSidebarExpanded && <span>Logout</span>}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

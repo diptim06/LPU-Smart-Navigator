@@ -16,6 +16,12 @@ export interface NodeItem {
 interface NavigationPanelProps {
   nodes: NodeItem[]
   edges: EdgeItem[]
+  appMode?: 'user' | 'admin'
+  isAdminAuthenticated?: boolean
+  isSidebarExpanded?: boolean
+  onModeToggle: (mode: 'user' | 'admin') => void
+  onOpenAdminLogin: () => void
+  onAdminLogout: () => void
   onRouteCalculated?: (result: RouteResult | null) => void
 }
 
@@ -58,30 +64,30 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
   }, [])
 
   return (
-    <div className="relative font-sans text-xs" ref={dropdownRef}>
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-        {label}
-      </label>
-
+    <div className="relative font-sans text-xs w-full" ref={dropdownRef}>
       {/* Main Select Button / Input Trigger */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-slate-800/90 border border-slate-700 hover:border-slate-600 px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between shadow-sm transition-all text-white"
+        className="w-full bg-slate-800/90 border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-xl cursor-pointer flex items-center justify-between shadow-sm transition-all text-white min-h-[36px]"
       >
-        <div className="truncate pr-2">
+        <div className="truncate pr-1">
           {selectedNode ? (
             <span className="font-medium text-slate-100">
+              <span className="text-slate-400 font-semibold mr-1">{label.split(' ')[0]}</span>
               {selectedNode.name}{' '}
-              <span className="text-indigo-400 text-[10px] capitalize font-normal">
+              <span className="text-indigo-400 text-[10px] capitalize font-normal hidden xl:inline">
                 • {selectedNode.type.replace('_', ' ')}
               </span>
             </span>
           ) : (
-            <span className="text-slate-400 font-normal">{placeholder}</span>
+            <span className="text-slate-400 font-normal">
+              <span className="font-semibold mr-1">{label.split(' ')[0]}</span>
+              {placeholder}
+            </span>
           )}
         </div>
         <svg
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -92,7 +98,7 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
 
       {/* Dropdown Options Popup */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 z-[1100] bg-slate-900 border border-slate-700/90 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md">
+        <div className="absolute top-full left-0 right-0 mt-1.5 z-[1200] min-w-[220px] bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
           {/* Search Field */}
           <div className="p-2 border-b border-slate-800 bg-slate-950/60">
             <input
@@ -101,12 +107,12 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
               placeholder="Search locations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-md text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
           {/* Options List */}
-          <div className="max-h-52 overflow-y-auto divide-y divide-slate-800/60">
+          <div className="max-h-56 overflow-y-auto divide-y divide-slate-800/60">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((node) => (
                 <div
@@ -121,7 +127,7 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
                   }`}
                 >
                   <span className="truncate pr-2 font-medium">{node.name}</span>
-                  <span className="text-[10px] text-slate-400 font-mono capitalize bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700/50">
+                  <span className="text-[10px] text-slate-400 font-mono capitalize bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-700/50">
                     {node.type.replace('_', ' ')}
                   </span>
                 </div>
@@ -138,11 +144,30 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
   )
 }
 
-export const NavigationPanel = ({ nodes, edges, onRouteCalculated }: NavigationPanelProps) => {
+export const NavigationPanel = ({
+  nodes,
+  edges,
+  appMode = 'user',
+  isAdminAuthenticated = false,
+  isSidebarExpanded = true,
+  onModeToggle,
+  onOpenAdminLogin,
+  onAdminLogout,
+  onRouteCalculated,
+}: NavigationPanelProps) => {
   const [startNodeId, setStartNodeId] = useState<string | null>(null)
   const [destNodeId, setDestNodeId] = useState<string | null>(null)
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const panelPositionClass = useMemo(() => {
+    if (appMode === 'admin') {
+      return isSidebarExpanded
+        ? 'left-[304px] right-4'
+        : 'left-[84px] right-4'
+    }
+    return 'left-4 right-4'
+  }, [appMode, isSidebarExpanded])
 
   // Filter ONLY valid POI nodes, deduplicating by name and prioritizing connected nodes over isolated duplicates
   const poiOptions = useMemo(() => {
@@ -242,111 +267,153 @@ export const NavigationPanel = ({ nodes, edges, onRouteCalculated }: NavigationP
   }
 
   return (
-    <div className="absolute top-4 left-4 z-[1000] w-80 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-700/80 shadow-2xl text-white font-sans select-none space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
-        <div className="flex items-center space-x-2">
+    <div
+      className={`fixed ${panelPositionClass} top-4 z-[1000] bg-slate-900/95 backdrop-blur-md p-2 rounded-2xl border border-slate-700/80 shadow-2xl text-white font-sans transition-all duration-300 select-none space-y-1.5 pointer-events-auto`}
+    >
+      {/* Row 1: Single Responsive Flex Header Controls Row */}
+      <div className="flex items-center justify-between gap-2.5 flex-wrap md:flex-nowrap">
+        {/* Left: Brand Logo */}
+        <div className="flex items-center space-x-2 shrink-0 pr-2 border-r border-slate-800 hidden lg:flex">
           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-          <h2 className="font-bold text-sm text-slate-100 tracking-wide">Campus Navigator</h2>
+          <h2 className="font-bold text-xs text-slate-100 tracking-wide whitespace-nowrap">LPU Navigator</h2>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-          {poiOptions.length} POIs
-        </span>
+
+        {/* Center: Search Inputs & Navigate Action Button */}
+        <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+          {/* Start Location Input */}
+          <div className="flex-1 min-w-[120px]">
+            <SearchableSelect
+              label="📍 Start"
+              placeholder="Select Start..."
+              options={poiOptions}
+              selectedNodeId={startNodeId}
+              onSelectNode={(id) => {
+                setStartNodeId(id)
+                setErrorMessage(null)
+                setRouteResult(null)
+                if (onRouteCalculated) onRouteCalculated(null)
+              }}
+            />
+          </div>
+
+          {/* Destination Input */}
+          <div className="flex-1 min-w-[120px]">
+            <SearchableSelect
+              label="🎯 Dest"
+              placeholder="Select Dest..."
+              options={poiOptions}
+              selectedNodeId={destNodeId}
+              onSelectNode={(id) => {
+                setDestNodeId(id)
+                setErrorMessage(null)
+                setRouteResult(null)
+                if (onRouteCalculated) onRouteCalculated(null)
+              }}
+            />
+          </div>
+
+          {/* Navigate Action Button */}
+          <button
+            type="button"
+            onClick={handleNavigateClick}
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center space-x-1.5 shrink-0 uppercase tracking-wider cursor-pointer"
+          >
+            <span className="text-sm">🧭</span>
+            <span>Navigate</span>
+          </button>
+        </div>
+
+        {/* Right: User / Admin Mode Switcher Controls */}
+        <div className="flex items-center space-x-1 shrink-0 border-l border-slate-800/80 pl-2">
+          <button
+            type="button"
+            onClick={() => onModeToggle('user')}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
+              appMode === 'user'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span>👤</span>
+            <span className="hidden sm:inline">User Mode</span>
+          </button>
+
+          {isAdminAuthenticated && appMode === 'admin' ? (
+            <div className="flex items-center space-x-1">
+              <button
+                type="button"
+                onClick={() => onModeToggle('admin')}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md shadow-amber-900/50 flex items-center space-x-1 cursor-default"
+              >
+                <span>👨‍💻</span>
+                <span className="hidden sm:inline">Admin Mode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onAdminLogout}
+                className="px-2 py-1.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-700/50 transition-colors cursor-pointer"
+                title="Logout from Admin session"
+              >
+                Logout 🚪
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-1 cursor-pointer"
+            >
+              <span>👨‍💻</span>
+              <span className="hidden sm:inline">Admin Login</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      <SearchableSelect
-        label="Current Location"
-        placeholder="Select Start Location..."
-        options={poiOptions}
-        selectedNodeId={startNodeId}
-        onSelectNode={(id) => {
-          setStartNodeId(id)
-          setErrorMessage(null)
-          setRouteResult(null)
-          if (onRouteCalculated) onRouteCalculated(null)
-        }}
-      />
-
-      <SearchableSelect
-        label="Destination"
-        placeholder="Select Destination..."
-        options={poiOptions}
-        selectedNodeId={destNodeId}
-        onSelectNode={(id) => {
-          setDestNodeId(id)
-          setErrorMessage(null)
-          setRouteResult(null)
-          if (onRouteCalculated) onRouteCalculated(null)
-        }}
-      />
-
+      {/* Error Message banner */}
       {errorMessage && (
-        <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700/80 text-rose-200 text-xs font-medium animate-fadeIn">
-          ⚠️ {errorMessage}
+        <div className="px-3 py-1.5 rounded-xl bg-rose-950/80 border border-rose-700/80 text-rose-200 text-xs font-medium animate-fadeIn flex items-center space-x-1.5">
+          <span>⚠️</span>
+          <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Floating Route Information Card */}
+      {/* Row 2: Compact Route Summary Row (Only when route is calculated) */}
       {routeResult && routeResult.found && startNode && destNode && (
-        <div className="p-3 bg-gradient-to-br from-indigo-950/90 to-blue-950/90 border border-indigo-500/50 rounded-xl space-y-2 shadow-xl animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-indigo-800/60 pb-1.5">
-            <span className="text-xs font-bold text-indigo-200 flex items-center space-x-1">
-              <span>🚶 Optimal Route Found</span>
-            </span>
+        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-indigo-950/95 via-slate-900/95 to-blue-950/95 border border-indigo-500/50 px-3 py-1.5 rounded-xl text-xs shadow-xl animate-fadeIn">
+          <div className="flex items-center space-x-2 truncate">
+            <span className="text-emerald-400 font-bold text-xs shrink-0">🚶 Route:</span>
+            <span className="font-bold text-slate-100 truncate">{startNode.name}</span>
+            <span className="text-indigo-400 font-bold">➔</span>
+            <span className="font-bold text-slate-100 truncate">{destNode.name}</span>
+          </div>
+
+          <div className="flex items-center space-x-2.5 shrink-0 text-xs font-mono">
+            <div className="bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/60 text-indigo-300 font-bold">
+              {routeResult.totalDistance >= 1000
+                ? `${(routeResult.totalDistance / 1000).toFixed(2)} km`
+                : `${routeResult.totalDistance} m`}
+            </div>
+
+            <div className="bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/60 text-emerald-300 font-bold">
+              ⏱ {Math.floor(routeResult.walkingTime / 60)}m {Math.round(routeResult.walkingTime % 60)}s
+            </div>
+
+            <div className="text-slate-400 text-[10px] hidden lg:block">
+              {routeResult.nodeIds.length} nodes
+            </div>
+
             <button
               type="button"
               onClick={handleClearRoute}
-              className="text-[10px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded transition-colors"
+              className="text-[10px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-700 transition-colors cursor-pointer"
             >
-              Clear
+              Clear ✕
             </button>
-          </div>
-
-          <div className="space-y-1 text-xs">
-            <div className="truncate">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Start:</span>{' '}
-              <span className="font-bold text-white">{startNode.name}</span>
-            </div>
-            <div className="truncate">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Dest:</span>{' '}
-              <span className="font-bold text-white">{destNode.name}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-indigo-900/60 text-xs font-mono">
-            <div className="bg-slate-900/70 p-1.5 rounded-lg border border-indigo-900/50">
-              <div className="text-[9px] text-slate-400 uppercase font-sans">Total Distance</div>
-              <div className="text-indigo-300 font-bold text-sm">
-                {routeResult.totalDistance >= 1000
-                  ? `${(routeResult.totalDistance / 1000).toFixed(2)} km`
-                  : `${routeResult.totalDistance} m`}
-              </div>
-            </div>
-
-            <div className="bg-slate-900/70 p-1.5 rounded-lg border border-indigo-900/50">
-              <div className="text-[9px] text-slate-400 uppercase font-sans">Est. Walk Time</div>
-              <div className="text-emerald-300 font-bold text-sm">
-                {Math.floor(routeResult.walkingTime / 60)}m {Math.round(routeResult.walkingTime % 60)}s
-              </div>
-            </div>
-          </div>
-
-          <div className="text-[10px] text-slate-400 pt-0.5 text-center font-mono">
-            Traversed: <span className="text-slate-200 font-semibold">{routeResult.nodeIds.length} nodes</span> •{' '}
-            <span className="text-slate-200 font-semibold">{routeResult.geometry.length} polyline points</span>
           </div>
         </div>
       )}
-
-      <button
-        type="button"
-        onClick={handleNavigateClick}
-        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 tracking-wider uppercase"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-        </svg>
-        <span>Navigate</span>
-      </button>
     </div>
   )
 }
