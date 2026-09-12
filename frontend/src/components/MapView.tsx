@@ -135,9 +135,9 @@ const calculateDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2:
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2)
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return Math.round(R * c * 10) / 10
 }
@@ -196,11 +196,11 @@ const findNearestPointOnEdge = (
     edge.geometry && edge.geometry.length >= 2
       ? edge.geometry
       : fromNode && toNode
-      ? [
+        ? [
           [fromNode.latitude, fromNode.longitude],
           [toNode.latitude, toNode.longitude],
         ]
-      : null
+        : null
 
   if (!geom) return null
 
@@ -265,11 +265,11 @@ const splitEdgeAtNode = (
     originalEdge.geometry && originalEdge.geometry.length >= 2
       ? originalEdge.geometry
       : fromNode && toNode
-      ? [
+        ? [
           [fromNode.latitude, fromNode.longitude],
           [toNode.latitude, toNode.longitude],
         ]
-      : [[node.latitude, node.longitude]]
+        : [[node.latitude, node.longitude]]
 
   const navPt: [number, number] = [node.latitude, node.longitude]
   const geomPart1: [number, number][] = [...baseGeometry.slice(0, segmentIndex + 1), navPt]
@@ -347,7 +347,7 @@ const NodeForm = ({ pendingNode, onSave, onCancel }: NodeFormProps) => {
       <div className="font-bold text-sm text-indigo-900 border-b border-slate-200 pb-1">
         Add New Node
       </div>
-      
+
       <div>
         <label className="block text-[10px] font-semibold uppercase text-slate-500 tracking-wider">
           Coordinates
@@ -451,7 +451,7 @@ interface EditNodeFormProps {
 
 const EditNodeForm = ({ node, onSave, onDelete, onCancel }: EditNodeFormProps) => {
   const isPreset = (SUPPORTED_NODE_TYPES as readonly string[]).includes(node.type) && node.type !== 'custom'
-  
+
   const [name, setName] = useState<string>(node.name)
   const [category, setCategory] = useState<'POI' | 'Navigation'>(node.category || 'POI')
   const [typeSelect, setTypeSelect] = useState<string>(isPreset ? node.type : 'custom')
@@ -1386,6 +1386,13 @@ export const MapView = () => {
     }
   }
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('admin') === 'true' || window.location.hash === '#admin') {
+      handleOpenAdminLogin()
+    }
+  }, [])
+
   const handleAdminLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (
@@ -1671,9 +1678,9 @@ export const MapView = () => {
       originalEdge.geometry && originalEdge.geometry.length >= 2
         ? originalEdge.geometry
         : [
-            [nodesMap.get(originalEdge.fromNodeId)?.latitude || 0, nodesMap.get(originalEdge.fromNodeId)?.longitude || 0],
-            [nodesMap.get(originalEdge.toNodeId)?.latitude || 0, nodesMap.get(originalEdge.toNodeId)?.longitude || 0],
-          ],
+          [nodesMap.get(originalEdge.fromNodeId)?.latitude || 0, nodesMap.get(originalEdge.fromNodeId)?.longitude || 0],
+          [nodesMap.get(originalEdge.toNodeId)?.latitude || 0, nodesMap.get(originalEdge.toNodeId)?.longitude || 0],
+        ],
       [clickedLat, clickedLng]
     )
 
@@ -1696,7 +1703,7 @@ export const MapView = () => {
     // CRITICAL POI PRESERVATION FIX: Only search and reuse existing NAVIGATION nodes. NEVER reuse a POI node!
     const nearbyNavNode = nodes.find(
       (n) => (n.category === 'Navigation' || n.isHidden === true) &&
-             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
+        calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
     )
 
     let connectNode: NodeItem
@@ -1750,14 +1757,14 @@ export const MapView = () => {
     // CRITICAL POI CONNECTIVITY: If a POI node is within 15 meters of the merge point, connect connectNode -> POI without modifying POI
     const nearbyPoi = nodes.find(
       (n) => !n.isHidden && n.category !== 'Navigation' &&
-             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
+        calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
     )
 
     let poiConnectionEdge: EdgeItem | null = null
     if (nearbyPoi) {
       const isPoiConnected = edges.some(
         (e) => (e.fromNodeId === connectNode.id && e.toNodeId === nearbyPoi.id) ||
-               (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
+          (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
       )
       if (!isPoiConnected) {
         const pDist = calculateDistanceMeters(connectNode.latitude, connectNode.longitude, nearbyPoi.latitude, nearbyPoi.longitude)
@@ -1800,7 +1807,7 @@ export const MapView = () => {
     // CRITICAL POI PRESERVATION FIX: Only search and reuse existing NAVIGATION nodes. NEVER reuse a POI node!
     const nearbyNavNode = nodes.find(
       (n) => (n.category === 'Navigation' || n.isHidden === true) &&
-             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
+        calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= NODE_REUSE_TOLERANCE_METERS
     )
 
     let connectNode: NodeItem
@@ -1853,14 +1860,14 @@ export const MapView = () => {
     // CRITICAL POI CONNECTIVITY: If a POI node is within 15 meters of the junction point, connect connectNode -> POI without modifying POI
     const nearbyPoi = nodes.find(
       (n) => !n.isHidden && n.category !== 'Navigation' &&
-             calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
+        calculateDistanceMeters(n.latitude, n.longitude, snapLat, snapLng) <= 15
     )
 
     let poiConnectionEdge: EdgeItem | null = null
     if (nearbyPoi) {
       const isPoiConnected = edges.some(
         (e) => (e.fromNodeId === connectNode.id && e.toNodeId === nearbyPoi.id) ||
-               (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
+          (e.fromNodeId === nearbyPoi.id && e.toNodeId === connectNode.id)
       )
       if (!isPoiConnected) {
         const pDist = calculateDistanceMeters(connectNode.latitude, connectNode.longitude, nearbyPoi.latitude, nearbyPoi.longitude)
@@ -2061,9 +2068,8 @@ export const MapView = () => {
       {/* Admin Mode Collapsible Left Sidebar (Sprint 9.2) */}
       {appMode === 'admin' && (
         <div
-          className={`absolute top-4 left-4 z-[1100] max-h-[calc(100vh-2rem)] bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-md transition-all duration-300 flex flex-col overflow-hidden select-none font-sans ${
-            isSidebarExpanded ? 'w-72' : 'w-16'
-          }`}
+          className={`absolute top-4 left-4 z-[1100] max-h-[calc(100vh-2rem)] bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-md transition-all duration-300 flex flex-col overflow-hidden select-none font-sans ${isSidebarExpanded ? 'w-72' : 'w-16'
+            }`}
         >
           {/* Sidebar Header & Toggle */}
           <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
@@ -2112,13 +2118,11 @@ export const MapView = () => {
                     setEditingNode(null)
                     setSplitTarget(null)
                   }}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
-                  } py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isNodeMode
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                    } py-2 rounded-xl text-xs font-semibold transition-all ${isNodeMode
                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
+                    }`}
                   title="Draw Node Mode"
                 >
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isNodeMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
@@ -2141,13 +2145,11 @@ export const MapView = () => {
                     setEditingNode(null)
                     setSplitTarget(null)
                   }}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
-                  } py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isPathMode
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                    } py-2 rounded-xl text-xs font-semibold transition-all ${isPathMode
                       ? 'bg-amber-600 text-white shadow-md shadow-amber-900/50'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
+                    }`}
                   title="Path Drawing Mode"
                 >
                   <span className="text-sm shrink-0">🖊</span>
@@ -2168,13 +2170,11 @@ export const MapView = () => {
                     setEditingNode(null)
                     setSplitTarget(null)
                   }}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
-                  } py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isInsertNavMode
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2.5 px-3' : 'justify-center px-0'
+                    } py-2 rounded-xl text-xs font-semibold transition-all ${isInsertNavMode
                       ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/50'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
+                    }`}
                   title="Insert Navigation Node Mode"
                 >
                   <span className="text-sm shrink-0">📍</span>
@@ -2219,9 +2219,8 @@ export const MapView = () => {
                   type="button"
                   onClick={handleSaveGraphToBackend}
                   disabled={isSavingGraph}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer disabled:opacity-50`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer disabled:opacity-50`}
                   title="Save graph directly to C++ backend"
                 >
                   <span className="text-sm shrink-0">💾</span>
@@ -2230,9 +2229,8 @@ export const MapView = () => {
 
                 {/* Import Nodes */}
                 <label
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
                   title="Import Nodes JSON"
                 >
                   <span className="text-sm shrink-0">📥</span>
@@ -2244,9 +2242,8 @@ export const MapView = () => {
                 <button
                   type="button"
                   onClick={handleExportNodes}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
                   title="Export Nodes JSON"
                 >
                   <span className="text-sm shrink-0">📤</span>
@@ -2255,9 +2252,8 @@ export const MapView = () => {
 
                 {/* Import Edges */}
                 <label
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
                   title="Import Edges JSON"
                 >
                   <span className="text-sm shrink-0">📥</span>
@@ -2269,9 +2265,8 @@ export const MapView = () => {
                 <button
                   type="button"
                   onClick={handleExportEdges}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer`}
                   title="Export Edges JSON"
                 >
                   <span className="text-sm shrink-0">📤</span>
@@ -2282,9 +2277,8 @@ export const MapView = () => {
                 <button
                   type="button"
                   onClick={handleReloadOfficial}
-                  className={`w-full flex items-center ${
-                    isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                  } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer`}
+                  className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                    } py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer`}
                   title="Reload Official Dataset"
                 >
                   <span className="text-sm shrink-0">🔄</span>
@@ -2336,9 +2330,8 @@ export const MapView = () => {
               <button
                 type="button"
                 onClick={handleAdminLogout}
-                className={`w-full flex items-center ${
-                  isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
-                } py-2 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/60 transition-all cursor-pointer`}
+                className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start space-x-2 px-3' : 'justify-center px-0'
+                  } py-2 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/60 transition-all cursor-pointer`}
                 title="Logout from Admin session"
               >
                 <span className="text-sm shrink-0">🚪</span>
@@ -2352,11 +2345,10 @@ export const MapView = () => {
       {/* Save Graph Status Toast Banner (Sprint 8.6) */}
       {saveStatusMessage && (
         <div
-          className={`absolute top-20 left-1/2 -translate-x-1/2 z-[1100] px-5 py-2.5 rounded-xl shadow-2xl backdrop-blur-md text-xs font-bold border transition-all animate-bounce flex items-center space-x-2 select-none ${
-            saveStatusMessage.type === 'success'
+          className={`absolute top-20 left-1/2 -translate-x-1/2 z-[1100] px-5 py-2.5 rounded-xl shadow-2xl backdrop-blur-md text-xs font-bold border transition-all animate-bounce flex items-center space-x-2 select-none ${saveStatusMessage.type === 'success'
               ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/60'
               : 'bg-rose-950/90 text-rose-200 border-rose-500/60'
-          }`}
+            }`}
         >
           <span>{saveStatusMessage.text}</span>
         </div>
@@ -2509,9 +2501,9 @@ export const MapView = () => {
               hoveredSnap.edge.geometry && hoveredSnap.edge.geometry.length >= 2
                 ? hoveredSnap.edge.geometry
                 : [
-                    [nodesMap.get(hoveredSnap.edge.fromNodeId)?.latitude || 0, nodesMap.get(hoveredSnap.edge.fromNodeId)?.longitude || 0],
-                    [nodesMap.get(hoveredSnap.edge.toNodeId)?.latitude || 0, nodesMap.get(hoveredSnap.edge.toNodeId)?.longitude || 0],
-                  ]
+                  [nodesMap.get(hoveredSnap.edge.fromNodeId)?.latitude || 0, nodesMap.get(hoveredSnap.edge.fromNodeId)?.longitude || 0],
+                  [nodesMap.get(hoveredSnap.edge.toNodeId)?.latitude || 0, nodesMap.get(hoveredSnap.edge.toNodeId)?.longitude || 0],
+                ]
             }
             pathOptions={{
               color: '#38bdf8',
@@ -2546,9 +2538,9 @@ export const MapView = () => {
               edge.geometry && edge.geometry.length >= 2
                 ? edge.geometry
                 : [
-                    [fromNode.latitude, fromNode.longitude],
-                    [toNode.latitude, toNode.longitude],
-                  ]
+                  [fromNode.latitude, fromNode.longitude],
+                  [toNode.latitude, toNode.longitude],
+                ]
 
             const isBeingGeomEdited = editingGeometryEdge?.id === edge.id
 
@@ -2834,9 +2826,9 @@ export const MapView = () => {
               editingEdge.geometry && editingEdge.geometry.length >= 2
                 ? editingEdge.geometry
                 : [
-                    [nodesMap.get(editingEdge.fromNodeId)?.latitude || 0, nodesMap.get(editingEdge.fromNodeId)?.longitude || 0],
-                    [nodesMap.get(editingEdge.toNodeId)?.latitude || 0, nodesMap.get(editingEdge.toNodeId)?.longitude || 0],
-                  ]
+                  [nodesMap.get(editingEdge.fromNodeId)?.latitude || 0, nodesMap.get(editingEdge.fromNodeId)?.longitude || 0],
+                  [nodesMap.get(editingEdge.toNodeId)?.latitude || 0, nodesMap.get(editingEdge.toNodeId)?.longitude || 0],
+                ]
             )}
             eventHandlers={{
               remove: () => setEditingEdge(null),

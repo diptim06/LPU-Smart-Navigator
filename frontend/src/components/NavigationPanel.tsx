@@ -122,9 +122,8 @@ const SearchableSelect = ({ label, placeholder, options, selectedNodeId, onSelec
                     setIsOpen(false)
                     setSearchQuery('')
                   }}
-                  className={`px-3 py-2 cursor-pointer hover:bg-indigo-900/40 transition-colors flex items-center justify-between ${
-                    selectedNodeId === node.id ? 'bg-indigo-950/60 text-indigo-300 font-semibold' : 'text-slate-200'
-                  }`}
+                  className={`px-3 py-2 cursor-pointer hover:bg-indigo-900/40 transition-colors flex items-center justify-between ${selectedNodeId === node.id ? 'bg-indigo-950/60 text-indigo-300 font-semibold' : 'text-slate-200'
+                    }`}
                 >
                   <span className="truncate pr-2 font-medium">{node.name}</span>
                   <span className="text-[10px] text-slate-400 font-mono capitalize bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-700/50">
@@ -260,6 +259,52 @@ export const NavigationPanel = ({
     }
   }
 
+  const logoClickCountRef = useRef<number>(0)
+  const logoClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) {
+      if (isAdminAuthenticated && appMode === 'admin') {
+        onModeToggle('user')
+      } else {
+        onOpenAdminLogin()
+      }
+      return
+    }
+
+    logoClickCountRef.current += 1
+    if (logoClickTimerRef.current) clearTimeout(logoClickTimerRef.current)
+
+    if (logoClickCountRef.current >= 3) {
+      logoClickCountRef.current = 0
+      if (isAdminAuthenticated && appMode === 'admin') {
+        onModeToggle('user')
+      } else {
+        onOpenAdminLogin()
+      }
+    } else {
+      logoClickTimerRef.current = setTimeout(() => {
+        logoClickCountRef.current = 0
+      }, 500)
+    }
+  }
+
+  // Keyboard shortcut (Ctrl+Shift+A or Alt+Shift+A) to toggle hidden admin mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey || e.altKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        if (isAdminAuthenticated && appMode === 'admin') {
+          onModeToggle('user')
+        } else {
+          onOpenAdminLogin()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isAdminAuthenticated, appMode, onModeToggle, onOpenAdminLogin])
+
   const handleClearRoute = () => {
     setRouteResult(null)
     setErrorMessage(null)
@@ -272,10 +317,16 @@ export const NavigationPanel = ({
     >
       {/* Row 1: Single Responsive Flex Header Controls Row */}
       <div className="flex items-center justify-between gap-2.5 flex-wrap md:flex-nowrap">
-        {/* Left: Brand Logo */}
-        <div className="flex items-center space-x-2 shrink-0 pr-2 border-r border-slate-800 hidden lg:flex">
-          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-          <h2 className="font-bold text-xs text-slate-100 tracking-wide whitespace-nowrap">LPU Navigator</h2>
+        {/* Left: Brand Logo (Secret triple-click or Alt+click opens Admin Login) */}
+        <div
+          onClick={handleLogoClick}
+          className="flex items-center space-x-2 shrink-0 pr-2 border-r border-slate-800 hidden lg:flex cursor-pointer group"
+          title="LPU Navigator (Triple-click or Alt+Click for Admin)"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse group-hover:bg-amber-400 transition-colors" />
+          <h2 className="font-bold text-xs text-slate-100 tracking-wide whitespace-nowrap group-hover:text-indigo-300 transition-colors">
+            LPU Navigator
+          </h2>
         </div>
 
         {/* Center: Search Inputs & Navigate Action Button */}
@@ -323,52 +374,24 @@ export const NavigationPanel = ({
           </button>
         </div>
 
-        {/* Right: User / Admin Mode Switcher Controls */}
-        <div className="flex items-center space-x-1 shrink-0 border-l border-slate-800/80 pl-2">
-          <button
-            type="button"
-            onClick={() => onModeToggle('user')}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
-              appMode === 'user'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <span>👤</span>
-            <span className="hidden sm:inline">User Mode</span>
-          </button>
+        {/* Right: Only visible when Admin Mode is active */}
+        {isAdminAuthenticated && appMode === 'admin' && (
+          <div className="flex items-center space-x-1.5 shrink-0 border-l border-slate-800/80 pl-2">
+            <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-600 text-white shadow-md shadow-amber-900/50 flex items-center space-x-1">
+              <span>👨‍💻</span>
+              <span className="hidden sm:inline">Admin Mode</span>
+            </span>
 
-          {isAdminAuthenticated && appMode === 'admin' ? (
-            <div className="flex items-center space-x-1">
-              <button
-                type="button"
-                onClick={() => onModeToggle('admin')}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white shadow-md shadow-amber-900/50 flex items-center space-x-1 cursor-default"
-              >
-                <span>👨‍💻</span>
-                <span className="hidden sm:inline">Admin Mode</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onAdminLogout}
-                className="px-2 py-1.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-700/50 transition-colors cursor-pointer"
-                title="Logout from Admin session"
-              >
-                Logout 🚪
-              </button>
-            </div>
-          ) : (
             <button
               type="button"
-              onClick={onOpenAdminLogin}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-1 cursor-pointer"
+              onClick={onAdminLogout}
+              className="px-2 py-1 rounded-xl text-[11px] font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-700/50 transition-colors cursor-pointer"
+              title="Logout from Admin session"
             >
-              <span>👨‍💻</span>
-              <span className="hidden sm:inline">Admin Login</span>
+              Exit 🚪
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Error Message banner */}
