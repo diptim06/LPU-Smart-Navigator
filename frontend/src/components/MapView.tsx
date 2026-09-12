@@ -1171,15 +1171,7 @@ export const MapView = () => {
     }
   })
 
-  const [appMode, setAppMode] = useState<'user' | 'admin'>(() => {
-    try {
-      const isAuth = localStorage.getItem(LOCAL_STORAGE_ADMIN_AUTH_KEY) === 'true'
-      const saved = localStorage.getItem('lpu_app_mode')
-      return isAuth && saved === 'admin' ? 'admin' : 'user'
-    } catch {
-      return 'user'
-    }
-  })
+  const [appMode, setAppMode] = useState<'user' | 'admin'>('user')
 
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
     try {

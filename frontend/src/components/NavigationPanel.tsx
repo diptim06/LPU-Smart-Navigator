@@ -321,7 +321,7 @@ export const NavigationPanel = ({
         <div
           onClick={handleLogoClick}
           className="flex items-center space-x-2 shrink-0 pr-2 border-r border-slate-800 hidden lg:flex cursor-pointer group"
-          title="LPU Navigator (Triple-click or Alt+Click for Admin)"
+          title="LPU Navigator"
         >
           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse group-hover:bg-amber-400 transition-colors" />
           <h2 className="font-bold text-xs text-slate-100 tracking-wide whitespace-nowrap group-hover:text-indigo-300 transition-colors">
