@@ -1,48 +1,12 @@
 #include "HttpServer.hpp"
 #include "SimpleJson.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <unordered_set>
-#include <cctype>
 
 using namespace std;
-
-HttpServer::HttpServer(Graph& graph, SearchIndex& searchIndex, RoutingManager& routingManager, uint16_t port)
-    : graph_(graph), searchIndex_(searchIndex), routingManager_(routingManager), port_(port) {}
-
-HttpServer::~HttpServer() {
-    stop();
-}
-
-void HttpServer::startAsync() {
-    running_ = true;
-    serverThread_ = thread(&HttpServer::listenLoop, this);
-}
-
-void HttpServer::start() {
-    running_ = true;
-    listenLoop();
-}
-
-void HttpServer::stop() {
-    if (running_) {
-        running_ = false;
-        if (serverFd_ >= 0) {
-            ::close(serverFd_);
-            serverFd_ = -1;
-        }
-        if (serverThread_.joinable()) {
-            serverThread_.join();
-        }
-    }
-}
 
 static string extractJsonField(const string& json, const string& key) {
     string search = "\"" + key + "\"";
@@ -59,22 +23,6 @@ static string extractJsonField(const string& json, const string& key) {
     if (endQuote == string::npos) return "";
 
     return json.substr(startQuote + 1, endQuote - startQuote - 1);
-}
-
-static string extractQueryParam(const string& url, const string& param) {
-    string key = param + "=";
-    size_t pos = url.find(key);
-    if (pos == string::npos) return "";
-
-    pos += key.length();
-    size_t end = url.find('&', pos);
-    if (end == string::npos) {
-        end = url.find(' ', pos);
-    }
-    if (end == string::npos) {
-        end = url.length();
-    }
-    return url.substr(pos, end - pos);
 }
 
 static string extractRawJsonArray(const string& json, const string& key) {
@@ -97,6 +45,36 @@ static string extractRawJsonArray(const string& json, const string& key) {
         return json.substr(pos, i - pos);
     }
     return "";
+}
+
+HttpServer::HttpServer(Graph& graph, SearchIndex& searchIndex, RoutingManager& routingManager, uint16_t port)
+    : graph_(graph), searchIndex_(searchIndex), routingManager_(routingManager), port_(port) {
+    setupRoutes();
+}
+
+HttpServer::~HttpServer() {
+    stop();
+}
+
+void HttpServer::startAsync() {
+    serverThread_ = thread([this]() {
+        cout << "HTTP Server running on http://localhost:" << port_ << endl;
+        server_.listen("0.0.0.0", port_);
+    });
+}
+
+void HttpServer::start() {
+    cout << "HTTP Server running on http://localhost:" << port_ << endl;
+    server_.listen("0.0.0.0", port_);
+}
+
+void HttpServer::stop() {
+    if (server_.is_running()) {
+        server_.stop();
+    }
+    if (serverThread_.joinable()) {
+        serverThread_.join();
+    }
 }
 
 string HttpServer::serializeRouteResult(const RouteResult& res) const {
@@ -129,213 +107,123 @@ string HttpServer::serializeRouteResult(const RouteResult& res) const {
     return ss.str();
 }
 
-void HttpServer::listenLoop() {
-    serverFd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (serverFd_ < 0) {
-        cerr << "HttpServer Error: Failed to create socket." << endl;
-        return;
-    }
+void HttpServer::setupRoutes() {
+    // Set CORS headers for all responses
+    server_.set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    });
 
-    int opt = 1;
-    ::setsockopt(serverFd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    // OPTIONS handler for CORS preflight
+    server_.Options(R"(.*)", [](const httplib::Request&, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.status = 200;
+    });
 
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(port_);
-
-    if (::bind(serverFd_, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        cerr << "HttpServer Error: Failed to bind port " << port_ << endl;
-        ::close(serverFd_);
-        serverFd_ = -1;
-        return;
-    }
-
-    if (::listen(serverFd_, 10) < 0) {
-        cerr << "HttpServer Error: Failed to listen on port " << port_ << endl;
-        ::close(serverFd_);
-        serverFd_ = -1;
-        return;
-    }
-
-    cout << "HTTP Server running on http://localhost:" << port_ << endl;
-
-    while (running_) {
-        sockaddr_in clientAddr{};
-        socklen_t clientLen = sizeof(clientAddr);
-        int clientFd = ::accept(serverFd_, (struct sockaddr*)&clientAddr, &clientLen);
-
-        if (clientFd < 0) {
-            if (!running_) break;
-            continue;
-        }
-
-        handleClient(clientFd);
-    }
-}
-
-void HttpServer::handleClient(int clientFd) {
-    string request;
-    char buffer[16384];
-    ssize_t bytesRead = 0;
-
-    while ((bytesRead = ::read(clientFd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[bytesRead] = '\0';
-        request.append(buffer, bytesRead);
-
-        size_t headerEnd = request.find("\r\n\r\n");
-        if (headerEnd != string::npos) {
-            size_t contentLength = 0;
-            size_t clPos = request.find("Content-Length:");
-            if (clPos == string::npos) clPos = request.find("content-length:");
-            if (clPos != string::npos) {
-                size_t valPos = request.find(':', clPos) + 1;
-                contentLength = stoul(request.substr(valPos));
-            }
-            if (request.length() - (headerEnd + 4) >= contentLength) {
-                break;
-            }
-        }
-    }
-
-    if (request.empty()) {
-        ::close(clientFd);
-        return;
-    }
-
-    stringstream responseHeaders;
-    responseHeaders << "Access-Control-Allow-Origin: *\r\n"
-                    << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                    << "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
-
-    if (request.rfind("OPTIONS", 0) == 0) {
-        string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() + "Content-Length: 0\r\n\r\n";
-        ::write(clientFd, resp.c_str(), resp.length());
-        ::close(clientFd);
-        return;
-    }
-
-    if (request.find("/api/save-graph") != string::npos) {
-        size_t bodyPos = request.find("\r\n\r\n");
-        string requestBody = (bodyPos != string::npos) ? request.substr(bodyPos + 4) : "";
-        handleSaveGraph(clientFd, requestBody);
-        ::close(clientFd);
-        return;
-    }
-
-    if (request.find("/api/route") != string::npos) {
+    // POST /api/route endpoint
+    server_.Post("/api/route", [this](const httplib::Request& req, httplib::Response& res) {
         string startNodeId;
         string destNodeId;
 
-        size_t bodyPos = request.find("\r\n\r\n");
-        if (bodyPos != string::npos) {
-            string body = request.substr(bodyPos + 4);
-            startNodeId = extractJsonField(body, "startNodeId");
-            if (startNodeId.empty()) startNodeId = extractJsonField(body, "start");
+        if (!req.body.empty()) {
+            startNodeId = extractJsonField(req.body, "startNodeId");
+            if (startNodeId.empty()) startNodeId = extractJsonField(req.body, "start");
 
-            destNodeId = extractJsonField(body, "destinationNodeId");
-            if (destNodeId.empty()) destNodeId = extractJsonField(body, "dest");
+            destNodeId = extractJsonField(req.body, "destinationNodeId");
+            if (destNodeId.empty()) destNodeId = extractJsonField(req.body, "dest");
         }
 
-        if (startNodeId.empty()) startNodeId = extractQueryParam(request, "startNodeId");
-        if (startNodeId.empty()) startNodeId = extractQueryParam(request, "start");
-        if (destNodeId.empty()) destNodeId = extractQueryParam(request, "destinationNodeId");
-        if (destNodeId.empty()) destNodeId = extractQueryParam(request, "dest");
+        if (startNodeId.empty() && req.has_param("startNodeId")) {
+            startNodeId = req.get_param_value("startNodeId");
+        }
+        if (startNodeId.empty() && req.has_param("start")) {
+            startNodeId = req.get_param_value("start");
+        }
+        if (destNodeId.empty() && req.has_param("destinationNodeId")) {
+            destNodeId = req.get_param_value("destinationNodeId");
+        }
+        if (destNodeId.empty() && req.has_param("dest")) {
+            destNodeId = req.get_param_value("dest");
+        }
 
         cout << "POST /api/route | Start: " << startNodeId << " -> Dest: " << destNodeId << endl;
 
         RouteResult routeRes = routingManager_.findRoute(startNodeId, destNodeId);
         string jsonBody = serializeRouteResult(routeRes);
 
-        string fullResp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
-                          "Content-Type: application/json\r\n" +
-                          "Content-Length: " + to_string(jsonBody.length()) + "\r\n\r\n" + jsonBody;
+        res.set_content(jsonBody, "application/json");
+        res.status = 200;
+    });
 
-        ::write(clientFd, fullResp.c_str(), fullResp.length());
-    } else {
-        string body = "{\"error\": \"Endpoint Not Found\"}";
-        string respStr = "HTTP/1.1 404 Not Found\r\n" + responseHeaders.str() +
-                         "Content-Type: application/json\r\n" +
-                         "Content-Length: " + to_string(body.length()) + "\r\n\r\n" + body;
-        ::write(clientFd, respStr.c_str(), respStr.length());
-    }
+    // POST /api/save-graph endpoint
+    server_.Post("/api/save-graph", [this](const httplib::Request& req, httplib::Response& res) {
+        string nodesJson = extractRawJsonArray(req.body, "nodes");
+        string edgesJson = extractRawJsonArray(req.body, "edges");
 
-    ::close(clientFd);
-}
-
-void HttpServer::handleSaveGraph(int clientFd, const string& requestBody) {
-    string nodesJson = extractRawJsonArray(requestBody, "nodes");
-    string edgesJson = extractRawJsonArray(requestBody, "edges");
-
-    stringstream responseHeaders;
-    responseHeaders << "Access-Control-Allow-Origin: *\r\n"
-                    << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                    << "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
-
-    if (nodesJson.empty() || edgesJson.empty()) {
-        string errorJson = "{\"success\": false, \"error\": \"Invalid JSON payload: missing nodes or edges array\"}";
-        string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                      "Content-Type: application/json\r\n" +
-                      "Content-Length: " + to_string(errorJson.length()) + "\r\n\r\n" + errorJson;
-        ::write(clientFd, resp.c_str(), resp.length());
-        return;
-    }
-
-    try {
-        vector<Node> parsedNodes = SimpleJson::parseNodes(nodesJson);
-        vector<Edge> parsedEdges = SimpleJson::parseEdges(edgesJson);
-
-        unordered_set<string> validNodeIds;
-        for (const auto& n : parsedNodes) {
-            validNodeIds.insert(n.id);
+        if (nodesJson.empty() || edgesJson.empty()) {
+            string errorJson = "{\"success\": false, \"error\": \"Invalid JSON payload: missing nodes or edges array\"}";
+            res.set_content(errorJson, "application/json");
+            res.status = 400;
+            return;
         }
 
-        for (const auto& e : parsedEdges) {
-            if (validNodeIds.find(e.fromNodeId) == validNodeIds.end()) {
-                string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing fromNodeId '" + e.fromNodeId + "'\"}";
-                string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                              "Content-Type: application/json\r\n" +
-                              "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
-                ::write(clientFd, resp.c_str(), resp.length());
-                return;
+        try {
+            vector<Node> parsedNodes = SimpleJson::parseNodes(nodesJson);
+            vector<Edge> parsedEdges = SimpleJson::parseEdges(edgesJson);
+
+            unordered_set<string> validNodeIds;
+            for (const auto& n : parsedNodes) {
+                validNodeIds.insert(n.id);
             }
-            if (validNodeIds.find(e.toNodeId) == validNodeIds.end()) {
-                string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing toNodeId '" + e.toNodeId + "'\"}";
-                string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                              "Content-Type: application/json\r\n" +
-                              "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
-                ::write(clientFd, resp.c_str(), resp.length());
-                return;
+
+            for (const auto& e : parsedEdges) {
+                if (validNodeIds.find(e.fromNodeId) == validNodeIds.end()) {
+                    string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing fromNodeId '" + e.fromNodeId + "'\"}";
+                    res.set_content(err, "application/json");
+                    res.status = 400;
+                    return;
+                }
+                if (validNodeIds.find(e.toNodeId) == validNodeIds.end()) {
+                    string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing toNodeId '" + e.toNodeId + "'\"}";
+                    res.set_content(err, "application/json");
+                    res.status = 400;
+                    return;
+                }
             }
+
+            ofstream nodesFile("data/nodes.json");
+            nodesFile << nodesJson;
+            nodesFile.close();
+
+            ofstream edgesFile("data/edges.json");
+            edgesFile << edgesJson;
+            edgesFile.close();
+
+            graph_.loadNodes("data/nodes.json");
+            graph_.loadEdges("data/edges.json");
+            graph_.validateGraph();
+            searchIndex_.buildIndex(graph_);
+
+            cout << "Save Graph: Reloaded " << parsedNodes.size() << " nodes, " << parsedEdges.size() << " edges." << endl;
+
+            string successJson = "{\"success\": true, \"nodes\": " + to_string(parsedNodes.size()) +
+                                 ", \"edges\": " + to_string(parsedEdges.size()) + "}";
+            res.set_content(successJson, "application/json");
+            res.status = 200;
+        } catch (const exception& ex) {
+            string err = "{\"success\": false, \"error\": \"Failed to parse and save graph: " + string(ex.what()) + "\"}";
+            res.set_content(err, "application/json");
+            res.status = 400;
         }
+    });
 
-        ofstream nodesFile("data/nodes.json");
-        nodesFile << nodesJson;
-        nodesFile.close();
-
-        ofstream edgesFile("data/edges.json");
-        edgesFile << edgesJson;
-        edgesFile.close();
-
-        graph_.loadNodes("data/nodes.json");
-        graph_.loadEdges("data/edges.json");
-        graph_.validateGraph();
-        searchIndex_.buildIndex(graph_);
-
-        cout << "Save Graph: Reloaded " << parsedNodes.size() << " nodes, " << parsedEdges.size() << " edges." << endl;
-
-        string successJson = "{\"success\": true, \"nodes\": " + to_string(parsedNodes.size()) +
-                             ", \"edges\": " + to_string(parsedEdges.size()) + "}";
-
-        string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
-                      "Content-Type: application/json\r\n" +
-                      "Content-Length: " + to_string(successJson.length()) + "\r\n\r\n" + successJson;
-        ::write(clientFd, resp.c_str(), resp.length());
-    } catch (const exception& ex) {
-        string err = "{\"success\": false, \"error\": \"Failed to parse and save graph: " + string(ex.what()) + "\"}";
-        string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                      "Content-Type: application/json\r\n" +
-                      "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
-        ::write(clientFd, resp.c_str(), resp.length());
-    }
+    // 404 Error handler
+    server_.set_error_handler([](const httplib::Request&, httplib::Response& res) {
+        if (res.status == 404) {
+            res.set_content("{\"error\": \"Endpoint Not Found\"}", "application/json");
+        }
+    });
 }

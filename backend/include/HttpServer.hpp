@@ -1,10 +1,10 @@
 #pragma once
 
+#include "httplib.h"
 #include "RoutingManager.hpp"
 #include "SearchIndex.hpp"
 #include "Graph.hpp"
 #include <string>
-#include <atomic>
 #include <thread>
 
 class HttpServer {
@@ -21,19 +21,16 @@ public:
     // Stop HTTP server
     void stop();
 
-    bool isRunning() const { return running_; }
+    bool isRunning() const { return server_.is_running(); }
 
 private:
     Graph& graph_;
     SearchIndex& searchIndex_;
     RoutingManager& routingManager_;
     uint16_t port_;
-    std::atomic<bool> running_{false};
-    int serverFd_{-1};
+    httplib::Server server_;
     std::thread serverThread_;
 
-    void listenLoop();
-    void handleClient(int clientFd);
+    void setupRoutes();
     std::string serializeRouteResult(const RouteResult& res) const;
-    void handleSaveGraph(int clientFd, const std::string& requestBody);
 };
