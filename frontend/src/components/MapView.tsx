@@ -4,6 +4,7 @@ import type { LatLngBoundsExpression } from 'leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import initialNodesData from '../../../backend/data/nodes.json'
+import initialEdgesData from '../../../backend/data/edges.json'
 import { NavigationPanel } from './NavigationPanel'
 import type { RouteResult } from '../utils/dijkstraRouter'
 import { saveGraphToBackend } from '../utils/apiClient'
@@ -1151,14 +1152,14 @@ const loadInitialEdges = (): EdgeItem[] => {
     const saved = localStorage.getItem(LOCAL_STORAGE_EDGES_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed as EdgeItem[]
       }
     }
   } catch (e) {
     console.error('Failed to load edges from localStorage:', e)
   }
-  return []
+  return initialEdgesData as EdgeItem[]
 }
 
 export const MapView = () => {
