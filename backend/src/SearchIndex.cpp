@@ -4,10 +4,12 @@
 #include <iostream>
 #include <unordered_map>
 
-static std::string toLower(const std::string& str) {
-    std::string lower = str;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+using namespace std;
+
+static string toLower(const string& str) {
+    string lower = str;
+    transform(lower.begin(), lower.end(), lower.begin(),
+              [](unsigned char c) { return tolower(c); });
     return lower;
 }
 
@@ -18,17 +20,15 @@ void SearchIndex::buildIndex(const Graph& graph) {
     const auto& nodes = graph.getNodes();
     const auto& adj = graph.getAdjacencyList();
 
-    // Map lowercase name to best representative POI node
-    std::unordered_map<std::string, Node> bestNodeMap;
-    std::unordered_map<std::string, int> bestDegreeMap;
+    unordered_map<string, Node> bestNodeMap;
+    unordered_map<string, int> bestDegreeMap;
 
     for (const auto& [id, node] : nodes) {
-        // Sprint 8.1 Specification: NEVER index hidden nodes or Navigation nodes
         if (node.isHidden || node.category == "Navigation") {
             continue;
         }
 
-        std::string lowerName = toLower(node.name);
+        string lowerName = toLower(node.name);
         int degree = 0;
         auto adjIt = adj.find(id);
         if (adjIt != adj.end()) {
@@ -41,7 +41,6 @@ void SearchIndex::buildIndex(const Graph& graph) {
             bestDegreeMap[lowerName] = degree;
         } else {
             int existingDegree = bestDegreeMap[lowerName];
-            // If new duplicate node is connected and existing is isolated, or has higher degree, prioritize connected node
             if (degree > existingDegree) {
                 bestNodeMap[lowerName] = node;
                 bestDegreeMap[lowerName] = degree;
@@ -63,26 +62,24 @@ void SearchIndex::buildIndex(const Graph& graph) {
         nameToIdMap_[lowerName] = node.id;
     }
 
-    // Sort index alphabetically by POI name for clean presentation
-    std::sort(index_.begin(), index_.end(), [](const SearchResult& a, const SearchResult& b) {
+    sort(index_.begin(), index_.end(), [](const SearchResult& a, const SearchResult& b) {
         return a.name < b.name;
     });
 
-    std::cout << "[Search Index] Indexed " << index_.size() 
-              << " unique searchable POIs (prioritizing connected nodes over isolated duplicates)." << std::endl;
+    cout << "Indexed " << index_.size() << " searchable POIs." << endl;
 }
 
-std::vector<SearchResult> SearchIndex::search(const std::string& query) const {
-    std::vector<SearchResult> results;
-    if (query.empty()) return index_; // Return all POIs if query is empty
+vector<SearchResult> SearchIndex::search(const string& query) const {
+    vector<SearchResult> results;
+    if (query.empty()) return index_;
 
-    std::string queryLower = toLower(query);
+    string queryLower = toLower(query);
 
     for (const auto& item : index_) {
-        std::string nameLower = toLower(item.name);
-        std::string typeLower = toLower(item.type);
+        string nameLower = toLower(item.name);
+        string typeLower = toLower(item.type);
 
-        if (nameLower.find(queryLower) != std::string::npos || typeLower.find(queryLower) != std::string::npos) {
+        if (nameLower.find(queryLower) != string::npos || typeLower.find(queryLower) != string::npos) {
             results.push_back(item);
         }
     }
@@ -90,8 +87,8 @@ std::vector<SearchResult> SearchIndex::search(const std::string& query) const {
     return results;
 }
 
-std::string SearchIndex::getNodeIdByName(const std::string& exactName) const {
-    std::string lowerName = toLower(exactName);
+string SearchIndex::getNodeIdByName(const string& exactName) const {
+    string lowerName = toLower(exactName);
     auto it = nameToIdMap_.find(lowerName);
     if (it != nameToIdMap_.end()) {
         return it->second;

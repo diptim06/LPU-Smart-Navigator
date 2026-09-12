@@ -5,19 +5,20 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace std;
+
 DijkstraRouter::DijkstraRouter(const Graph& graph)
     : graph_(graph) {}
 
 RouteResult DijkstraRouter::findRoute(
-    const std::string& startNodeId,
-    const std::string& destinationNodeId
+    const string& startNodeId,
+    const string& destinationNodeId
 ) {
     RouteResult result;
     const auto& nodes = graph_.getNodes();
     const auto& adj = graph_.getAdjacencyList();
     const auto& edges = graph_.getEdges();
 
-    // 1. Validation & Edge Cases
     auto startIt = nodes.find(startNodeId);
     auto destIt = nodes.find(destinationNodeId);
 
@@ -36,26 +37,21 @@ RouteResult DijkstraRouter::findRoute(
         return result;
     }
 
-    // Index edges by edge ID for quick geometry lookup
-    std::unordered_map<std::string, Edge> edgeMap;
+    unordered_map<string, Edge> edgeMap;
     for (const auto& edge : edges) {
         edgeMap[edge.id] = edge;
     }
 
-    // 2. Dijkstra Min-Heap Data Structures
-    // Min Priority Queue storing pair<distance, nodeId>
-    using Element = std::pair<double, std::string>;
-    std::priority_queue<Element, std::vector<Element>, std::greater<Element>> pq;
+    using Element = pair<double, string>;
+    priority_queue<Element, vector<Element>, greater<Element>> pq;
 
-    std::unordered_map<std::string, double> distMap;
-    // parentMap: nodeId -> pair<parent edgeId, parent nodeId>
-    std::unordered_map<std::string, std::pair<std::string, std::string>> parentMap;
-    std::unordered_set<std::string> visited;
+    unordered_map<string, double> distMap;
+    unordered_map<string, pair<string, string>> parentMap;
+    unordered_set<string> visited;
 
     distMap[startNodeId] = 0.0;
     pq.push({0.0, startNodeId});
 
-    // 3. Main Dijkstra Traversal Loop
     bool reachedDestination = false;
 
     while (!pq.empty()) {
@@ -92,11 +88,10 @@ RouteResult DijkstraRouter::findRoute(
         return result;
     }
 
-    // 4. Backtrack Parent Map to Reconstruct Path
-    std::vector<std::string> revNodeIds;
-    std::vector<std::string> revEdgeIds;
+    vector<string> revNodeIds;
+    vector<string> revEdgeIds;
 
-    std::string curr = destinationNodeId;
+    string curr = destinationNodeId;
     revNodeIds.push_back(curr);
 
     while (curr != startNodeId) {
@@ -109,29 +104,27 @@ RouteResult DijkstraRouter::findRoute(
         curr = parentNodeId;
     }
 
-    std::reverse(revNodeIds.begin(), revNodeIds.end());
-    std::reverse(revEdgeIds.begin(), revEdgeIds.end());
+    reverse(revNodeIds.begin(), revNodeIds.end());
+    reverse(revEdgeIds.begin(), revEdgeIds.end());
 
     result.found = true;
     result.totalDistance = distMap[destinationNodeId];
-    // Walking time at 1.4 m/s
-    result.walkingTime = std::round((result.totalDistance / 1.4) * 10.0) / 10.0;
+    result.walkingTime = round((result.totalDistance / 1.4) * 10.0) / 10.0;
     result.nodeIds = revNodeIds;
     result.edgeIds = revEdgeIds;
 
-    // 5. Merge Traversed Edge Geometries into One Continuous Polyline
-    std::vector<std::pair<double, double>> continuousGeometry;
+    vector<pair<double, double>> continuousGeometry;
 
     for (size_t i = 0; i < revEdgeIds.size(); ++i) {
-        const std::string& edgeId = revEdgeIds[i];
-        const std::string& fromId = revNodeIds[i];
-        const std::string& toId = revNodeIds[i + 1];
+        const string& edgeId = revEdgeIds[i];
+        const string& fromId = revNodeIds[i];
+        const string& toId = revNodeIds[i + 1];
 
         auto eIt = edgeMap.find(edgeId);
         if (eIt == edgeMap.end()) continue;
 
         const Edge& edgeObj = eIt->second;
-        std::vector<std::pair<double, double>> segGeom;
+        vector<pair<double, double>> segGeom;
 
         if (edgeObj.geometry.size() >= 2) {
             segGeom = edgeObj.geometry;
@@ -146,15 +139,14 @@ RouteResult DijkstraRouter::findRoute(
             }
         }
 
-        // Determine orientation: does segGeom start at fromId or toId?
         bool isForward = true;
         if (!segGeom.empty()) {
             auto fromNodeIt = nodes.find(fromId);
             if (fromNodeIt != nodes.end()) {
-                double dStart = std::hypot(segGeom.front().first - fromNodeIt->second.latitude,
-                                           segGeom.front().second - fromNodeIt->second.longitude);
-                double dEnd = std::hypot(segGeom.back().first - fromNodeIt->second.latitude,
-                                         segGeom.back().second - fromNodeIt->second.longitude);
+                double dStart = hypot(segGeom.front().first - fromNodeIt->second.latitude,
+                                      segGeom.front().second - fromNodeIt->second.longitude);
+                double dEnd = hypot(segGeom.back().first - fromNodeIt->second.latitude,
+                                    segGeom.back().second - fromNodeIt->second.longitude);
                 if (dEnd < dStart) {
                     isForward = false;
                 }
@@ -162,16 +154,15 @@ RouteResult DijkstraRouter::findRoute(
         }
 
         if (!isForward) {
-            std::reverse(segGeom.begin(), segGeom.end());
+            reverse(segGeom.begin(), segGeom.end());
         }
 
         for (const auto& pt : segGeom) {
             if (continuousGeometry.empty()) {
                 continuousGeometry.push_back(pt);
             } else {
-                // Avoid pushing identical duplicate adjacent points
                 const auto& lastPt = continuousGeometry.back();
-                if (std::abs(lastPt.first - pt.first) > 1e-6 || std::abs(lastPt.second - pt.second) > 1e-6) {
+                if (abs(lastPt.first - pt.first) > 1e-6 || abs(lastPt.second - pt.second) > 1e-6) {
                     continuousGeometry.push_back(pt);
                 }
             }

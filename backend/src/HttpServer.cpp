@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <cctype>
 
+using namespace std;
+
 HttpServer::HttpServer(Graph& graph, SearchIndex& searchIndex, RoutingManager& routingManager, uint16_t port)
     : graph_(graph), searchIndex_(searchIndex), routingManager_(routingManager), port_(port) {}
 
@@ -21,7 +23,7 @@ HttpServer::~HttpServer() {
 
 void HttpServer::startAsync() {
     running_ = true;
-    serverThread_ = std::thread(&HttpServer::listenLoop, this);
+    serverThread_ = thread(&HttpServer::listenLoop, this);
 }
 
 void HttpServer::start() {
@@ -42,46 +44,46 @@ void HttpServer::stop() {
     }
 }
 
-static std::string extractJsonField(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\"";
+static string extractJsonField(const string& json, const string& key) {
+    string search = "\"" + key + "\"";
     size_t pos = json.find(search);
-    if (pos == std::string::npos) return "";
+    if (pos == string::npos) return "";
 
     pos = json.find(':', pos);
-    if (pos == std::string::npos) return "";
+    if (pos == string::npos) return "";
 
     size_t startQuote = json.find('"', pos);
-    if (startQuote == std::string::npos) return "";
+    if (startQuote == string::npos) return "";
 
     size_t endQuote = json.find('"', startQuote + 1);
-    if (endQuote == std::string::npos) return "";
+    if (endQuote == string::npos) return "";
 
     return json.substr(startQuote + 1, endQuote - startQuote - 1);
 }
 
-static std::string extractQueryParam(const std::string& url, const std::string& param) {
-    std::string key = param + "=";
+static string extractQueryParam(const string& url, const string& param) {
+    string key = param + "=";
     size_t pos = url.find(key);
-    if (pos == std::string::npos) return "";
+    if (pos == string::npos) return "";
 
     pos += key.length();
     size_t end = url.find('&', pos);
-    if (end == std::string::npos) {
+    if (end == string::npos) {
         end = url.find(' ', pos);
     }
-    if (end == std::string::npos) {
+    if (end == string::npos) {
         end = url.length();
     }
     return url.substr(pos, end - pos);
 }
 
-static std::string extractRawJsonArray(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\"";
+static string extractRawJsonArray(const string& json, const string& key) {
+    string search = "\"" + key + "\"";
     size_t pos = json.find(search);
-    if (pos == std::string::npos) return "";
+    if (pos == string::npos) return "";
 
     pos = json.find('[', pos);
-    if (pos == std::string::npos) return "";
+    if (pos == string::npos) return "";
 
     int bracketCount = 1;
     size_t i = pos + 1;
@@ -97,8 +99,8 @@ static std::string extractRawJsonArray(const std::string& json, const std::strin
     return "";
 }
 
-std::string HttpServer::serializeRouteResult(const RouteResult& res) const {
-    std::stringstream ss;
+string HttpServer::serializeRouteResult(const RouteResult& res) const {
+    stringstream ss;
     ss << "{\n";
     ss << "  \"found\": " << (res.found ? "true" : "false") << ",\n";
     ss << "  \"totalDistance\": " << res.totalDistance << ",\n";
@@ -130,7 +132,7 @@ std::string HttpServer::serializeRouteResult(const RouteResult& res) const {
 void HttpServer::listenLoop() {
     serverFd_ = ::socket(AF_INET, SOCK_STREAM, 0);
     if (serverFd_ < 0) {
-        std::cerr << "❌ HttpServer Error: Failed to create socket." << std::endl;
+        cerr << "HttpServer Error: Failed to create socket." << endl;
         return;
     }
 
@@ -143,21 +145,20 @@ void HttpServer::listenLoop() {
     address.sin_port = htons(port_);
 
     if (::bind(serverFd_, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "❌ HttpServer Error: Failed to bind port " << port_ << std::endl;
+        cerr << "HttpServer Error: Failed to bind port " << port_ << endl;
         ::close(serverFd_);
         serverFd_ = -1;
         return;
     }
 
     if (::listen(serverFd_, 10) < 0) {
-        std::cerr << "❌ HttpServer Error: Failed to listen on port " << port_ << std::endl;
+        cerr << "HttpServer Error: Failed to listen on port " << port_ << endl;
         ::close(serverFd_);
         serverFd_ = -1;
         return;
     }
 
-    std::cout << "[C++ Backend HTTP Server] Live on http://localhost:" << port_ 
-              << " (Exposing POST /api/route & POST /api/save-graph)" << std::endl;
+    cout << "HTTP Server running on http://localhost:" << port_ << endl;
 
     while (running_) {
         sockaddr_in clientAddr{};
@@ -174,8 +175,7 @@ void HttpServer::listenLoop() {
 }
 
 void HttpServer::handleClient(int clientFd) {
-    // Read up to 2MB to support saving large graph datasets
-    std::string request;
+    string request;
     char buffer[16384];
     ssize_t bytesRead = 0;
 
@@ -183,18 +183,17 @@ void HttpServer::handleClient(int clientFd) {
         buffer[bytesRead] = '\0';
         request.append(buffer, bytesRead);
 
-        // Check if full HTTP headers and body received
         size_t headerEnd = request.find("\r\n\r\n");
-        if (headerEnd != std::string::npos) {
+        if (headerEnd != string::npos) {
             size_t contentLength = 0;
             size_t clPos = request.find("Content-Length:");
-            if (clPos == std::string::npos) clPos = request.find("content-length:");
-            if (clPos != std::string::npos) {
+            if (clPos == string::npos) clPos = request.find("content-length:");
+            if (clPos != string::npos) {
                 size_t valPos = request.find(':', clPos) + 1;
-                contentLength = std::stoul(request.substr(valPos));
+                contentLength = stoul(request.substr(valPos));
             }
             if (request.length() - (headerEnd + 4) >= contentLength) {
-                break; // Complete HTTP request received
+                break;
             }
         }
     }
@@ -204,36 +203,33 @@ void HttpServer::handleClient(int clientFd) {
         return;
     }
 
-    std::stringstream responseHeaders;
+    stringstream responseHeaders;
     responseHeaders << "Access-Control-Allow-Origin: *\r\n"
                     << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
                     << "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
 
-    // Handle OPTIONS CORS preflight
     if (request.rfind("OPTIONS", 0) == 0) {
-        std::string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() + "Content-Length: 0\r\n\r\n";
+        string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() + "Content-Length: 0\r\n\r\n";
         ::write(clientFd, resp.c_str(), resp.length());
         ::close(clientFd);
         return;
     }
 
-    // Handle POST /api/save-graph (Sprint 8.6)
-    if (request.find("/api/save-graph") != std::string::npos) {
+    if (request.find("/api/save-graph") != string::npos) {
         size_t bodyPos = request.find("\r\n\r\n");
-        std::string requestBody = (bodyPos != std::string::npos) ? request.substr(bodyPos + 4) : "";
+        string requestBody = (bodyPos != string::npos) ? request.substr(bodyPos + 4) : "";
         handleSaveGraph(clientFd, requestBody);
         ::close(clientFd);
         return;
     }
 
-    // Handle POST or GET /api/route
-    if (request.find("/api/route") != std::string::npos) {
-        std::string startNodeId;
-        std::string destNodeId;
+    if (request.find("/api/route") != string::npos) {
+        string startNodeId;
+        string destNodeId;
 
         size_t bodyPos = request.find("\r\n\r\n");
-        if (bodyPos != std::string::npos) {
-            std::string body = request.substr(bodyPos + 4);
+        if (bodyPos != string::npos) {
+            string body = request.substr(bodyPos + 4);
             startNodeId = extractJsonField(body, "startNodeId");
             if (startNodeId.empty()) startNodeId = extractJsonField(body, "start");
 
@@ -246,105 +242,100 @@ void HttpServer::handleClient(int clientFd) {
         if (destNodeId.empty()) destNodeId = extractQueryParam(request, "destinationNodeId");
         if (destNodeId.empty()) destNodeId = extractQueryParam(request, "dest");
 
-        std::cout << "\n[C++ API Request] POST /api/route | Start: " 
-                  << startNodeId << " ➔ Dest: " << destNodeId << std::endl;
+        cout << "POST /api/route | Start: " << startNodeId << " -> Dest: " << destNodeId << endl;
 
         RouteResult routeRes = routingManager_.findRoute(startNodeId, destNodeId);
-        std::string jsonBody = serializeRouteResult(routeRes);
+        string jsonBody = serializeRouteResult(routeRes);
 
-        std::string fullResp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
-                               "Content-Type: application/json\r\n" +
-                               "Content-Length: " + std::to_string(jsonBody.length()) + "\r\n\r\n" + jsonBody;
+        string fullResp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
+                          "Content-Type: application/json\r\n" +
+                          "Content-Length: " + to_string(jsonBody.length()) + "\r\n\r\n" + jsonBody;
 
         ::write(clientFd, fullResp.c_str(), fullResp.length());
     } else {
-        std::string body = "{\"error\": \"Endpoint Not Found\"}";
-        std::string respStr = "HTTP/1.1 404 Not Found\r\n" + responseHeaders.str() +
-                              "Content-Type: application/json\r\n" +
-                              "Content-Length: " + std::to_string(body.length()) + "\r\n\r\n" + body;
+        string body = "{\"error\": \"Endpoint Not Found\"}";
+        string respStr = "HTTP/1.1 404 Not Found\r\n" + responseHeaders.str() +
+                         "Content-Type: application/json\r\n" +
+                         "Content-Length: " + to_string(body.length()) + "\r\n\r\n" + body;
         ::write(clientFd, respStr.c_str(), respStr.length());
     }
 
     ::close(clientFd);
 }
 
-void HttpServer::handleSaveGraph(int clientFd, const std::string& requestBody) {
-    std::string nodesJson = extractRawJsonArray(requestBody, "nodes");
-    std::string edgesJson = extractRawJsonArray(requestBody, "edges");
+void HttpServer::handleSaveGraph(int clientFd, const string& requestBody) {
+    string nodesJson = extractRawJsonArray(requestBody, "nodes");
+    string edgesJson = extractRawJsonArray(requestBody, "edges");
 
-    std::stringstream responseHeaders;
+    stringstream responseHeaders;
     responseHeaders << "Access-Control-Allow-Origin: *\r\n"
                     << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
                     << "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
 
     if (nodesJson.empty() || edgesJson.empty()) {
-        std::string errorJson = "{\"success\": false, \"error\": \"Invalid JSON payload: missing nodes or edges array\"}";
-        std::string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                           "Content-Type: application/json\r\n" +
-                           "Content-Length: " + std::to_string(errorJson.length()) + "\r\n\r\n" + errorJson;
+        string errorJson = "{\"success\": false, \"error\": \"Invalid JSON payload: missing nodes or edges array\"}";
+        string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
+                      "Content-Type: application/json\r\n" +
+                      "Content-Length: " + to_string(errorJson.length()) + "\r\n\r\n" + errorJson;
         ::write(clientFd, resp.c_str(), resp.length());
         return;
     }
 
     try {
-        std::vector<Node> parsedNodes = SimpleJson::parseNodes(nodesJson);
-        std::vector<Edge> parsedEdges = SimpleJson::parseEdges(edgesJson);
+        vector<Node> parsedNodes = SimpleJson::parseNodes(nodesJson);
+        vector<Edge> parsedEdges = SimpleJson::parseEdges(edgesJson);
 
-        std::unordered_set<std::string> validNodeIds;
+        unordered_set<string> validNodeIds;
         for (const auto& n : parsedNodes) {
             validNodeIds.insert(n.id);
         }
 
-        // Validate edge node references
         for (const auto& e : parsedEdges) {
             if (validNodeIds.find(e.fromNodeId) == validNodeIds.end()) {
-                std::string err = "{\"success\": false, \"error\": \"Validation Error: Edge '" + e.id + "' references missing fromNodeId '" + e.fromNodeId + "'\"}";
-                std::string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                                   "Content-Type: application/json\r\n" +
-                                   "Content-Length: " + std::to_string(err.length()) + "\r\n\r\n" + err;
+                string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing fromNodeId '" + e.fromNodeId + "'\"}";
+                string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
+                              "Content-Type: application/json\r\n" +
+                              "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
                 ::write(clientFd, resp.c_str(), resp.length());
                 return;
             }
             if (validNodeIds.find(e.toNodeId) == validNodeIds.end()) {
-                std::string err = "{\"success\": false, \"error\": \"Validation Error: Edge '" + e.id + "' references missing toNodeId '" + e.toNodeId + "'\"}";
-                std::string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                                   "Content-Type: application/json\r\n" +
-                                   "Content-Length: " + std::to_string(err.length()) + "\r\n\r\n" + err;
+                string err = "{\"success\": false, \"error\": \"Edge '" + e.id + "' references missing toNodeId '" + e.toNodeId + "'\"}";
+                string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
+                              "Content-Type: application/json\r\n" +
+                              "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
                 ::write(clientFd, resp.c_str(), resp.length());
                 return;
             }
         }
 
-        // Overwrite disk files
-        std::ofstream nodesFile("data/nodes.json");
+        ofstream nodesFile("data/nodes.json");
         nodesFile << nodesJson;
         nodesFile.close();
 
-        std::ofstream edgesFile("data/edges.json");
+        ofstream edgesFile("data/edges.json");
         edgesFile << edgesJson;
         edgesFile.close();
 
-        // Hot Reload Graph, Validation, SearchIndex, and RoutingManager in memory
         graph_.loadNodes("data/nodes.json");
         graph_.loadEdges("data/edges.json");
         graph_.validateGraph();
         searchIndex_.buildIndex(graph_);
 
-        std::cout << "\n[C++ API Save Graph] Hot Reloaded Graph Engine: " 
-                  << parsedNodes.size() << " nodes, " << parsedEdges.size() << " edges saved to disk." << std::endl;
+        cout << "Save Graph: Reloaded " << parsedNodes.size() << " nodes, " << parsedEdges.size() << " edges." << endl;
 
-        std::string successJson = "{\"success\": true, \"nodes\": " + std::to_string(parsedNodes.size()) +
-                                  ", \"edges\": " + std::to_string(parsedEdges.size()) + "}";
+        string successJson = "{\"success\": true, \"nodes\": " + to_string(parsedNodes.size()) +
+                             ", \"edges\": " + to_string(parsedEdges.size()) + "}";
 
-        std::string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
-                           "Content-Type: application/json\r\n" +
-                           "Content-Length: " + std::to_string(successJson.length()) + "\r\n\r\n" + successJson;
+        string resp = "HTTP/1.1 200 OK\r\n" + responseHeaders.str() +
+                      "Content-Type: application/json\r\n" +
+                      "Content-Length: " + to_string(successJson.length()) + "\r\n\r\n" + successJson;
         ::write(clientFd, resp.c_str(), resp.length());
-    } catch (const std::exception& ex) {
-        std::string err = "{\"success\": false, \"error\": \"Failed to parse and save graph: " + std::string(ex.what()) + "\"}";
-        std::string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
-                           "Content-Type: application/json\r\n" +
-                           "Content-Length: " + std::to_string(err.length()) + "\r\n\r\n" + err;
+    } catch (const exception& ex) {
+        string err = "{\"success\": false, \"error\": \"Failed to parse and save graph: " + string(ex.what()) + "\"}";
+        string resp = "HTTP/1.1 400 Bad Request\r\n" + responseHeaders.str() +
+                      "Content-Type: application/json\r\n" +
+                      "Content-Length: " + to_string(err.length()) + "\r\n\r\n" + err;
         ::write(clientFd, resp.c_str(), resp.length());
     }
 }

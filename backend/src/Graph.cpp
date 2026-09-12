@@ -6,54 +6,55 @@
 #include <iomanip>
 #include <cctype>
 
-static std::string toLower(const std::string& str) {
-    std::string lower = str;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+using namespace std;
+
+static string toLower(const string& str) {
+    string lower = str;
+    transform(lower.begin(), lower.end(), lower.begin(),
+              [](unsigned char c) { return tolower(c); });
     return lower;
 }
 
-bool Graph::loadNodes(const std::string& filepath) {
+bool Graph::loadNodes(const string& filepath) {
     try {
-        std::string jsonStr = SimpleJson::readFile(filepath);
-        std::vector<Node> loadedNodes = SimpleJson::parseNodes(jsonStr);
+        string jsonStr = SimpleJson::readFile(filepath);
+        vector<Node> loadedNodes = SimpleJson::parseNodes(jsonStr);
 
         nodesMap_.clear();
         validationErrors_.clear();
         validationWarnings_.clear();
 
-        std::unordered_set<std::string> seenIds;
+        unordered_set<string> seenIds;
         for (const auto& node : loadedNodes) {
             if (seenIds.find(node.id) != seenIds.end()) {
-                validationErrors_.push_back("Validation Error: Duplicate Node ID detected -> '" + node.id + "'");
+                validationErrors_.push_back("Duplicate Node ID: " + node.id);
             } else {
                 seenIds.insert(node.id);
                 nodesMap_[node.id] = node;
             }
         }
 
-        std::cout << "[Graph Engine] Successfully parsed " << nodesMap_.size() << " nodes from " << filepath << std::endl;
+        cout << "Loaded " << nodesMap_.size() << " nodes from " << filepath << endl;
         return true;
-    } catch (const std::exception& ex) {
-        std::cerr << "[Graph Engine Error] Failed to load nodes: " << ex.what() << std::endl;
+    } catch (const exception& ex) {
+        cerr << "Failed to load nodes: " << ex.what() << endl;
         return false;
     }
 }
 
-bool Graph::loadEdges(const std::string& filepath) {
+bool Graph::loadEdges(const string& filepath) {
     try {
-        std::string jsonStr = SimpleJson::readFile(filepath);
+        string jsonStr = SimpleJson::readFile(filepath);
         edgesList_ = SimpleJson::parseEdges(jsonStr);
 
-        std::unordered_set<std::string> seenEdgeIds;
+        unordered_set<string> seenEdgeIds;
         for (auto& edge : edgesList_) {
             if (seenEdgeIds.find(edge.id) != seenEdgeIds.end()) {
-                validationErrors_.push_back("Validation Error: Duplicate Edge ID detected -> '" + edge.id + "'");
+                validationErrors_.push_back("Duplicate Edge ID: " + edge.id);
             } else {
                 seenEdgeIds.insert(edge.id);
             }
 
-            // Ensure geometry is never empty (populate at least fromNode and toNode endpoints)
             if (edge.geometry.empty() || edge.geometry.size() < 2) {
                 auto fromIt = nodesMap_.find(edge.fromNodeId);
                 auto toIt = nodesMap_.find(edge.toNodeId);
@@ -67,10 +68,10 @@ bool Graph::loadEdges(const std::string& filepath) {
         }
 
         buildAdjacencyList();
-        std::cout << "[Graph Engine] Successfully parsed " << edgesList_.size() << " edges from " << filepath << std::endl;
+        cout << "Loaded " << edgesList_.size() << " edges from " << filepath << endl;
         return true;
-    } catch (const std::exception& ex) {
-        std::cerr << "[Graph Engine Error] Failed to load edges: " << ex.what() << std::endl;
+    } catch (const exception& ex) {
+        cerr << "Failed to load edges: " << ex.what() << endl;
         return false;
     }
 }
@@ -78,13 +79,11 @@ bool Graph::loadEdges(const std::string& filepath) {
 void Graph::buildAdjacencyList() {
     adjList_.clear();
 
-    // Ensure entry for all known nodes
     for (const auto& [nodeId, node] : nodesMap_) {
-        adjList_[nodeId] = std::vector<AdjEdge>();
+        adjList_[nodeId] = vector<AdjEdge>();
     }
 
     for (const auto& edge : edgesList_) {
-        // Forward edge: fromNodeId -> toNodeId
         AdjEdge forwardEdge{
             edge.toNodeId,
             edge.id,
@@ -95,7 +94,6 @@ void Graph::buildAdjacencyList() {
         };
         adjList_[edge.fromNodeId].push_back(forwardEdge);
 
-        // Reverse edge if bidirectional: toNodeId -> fromNodeId
         if (edge.isBidirectional) {
             AdjEdge reverseEdge{
                 edge.fromNodeId,
@@ -112,64 +110,31 @@ void Graph::buildAdjacencyList() {
 
 bool Graph::validateGraph() const {
     bool isValid = true;
-    std::cout << "\n--------------------------------------------------" << std::endl;
-    std::cout << "               GRAPH VALIDATION REPORT            " << std::endl;
-    std::cout << "--------------------------------------------------" << std::endl;
 
     for (const auto& err : validationErrors_) {
-        std::cout << "❌ " << err << std::endl;
+        cout << "Error: " << err << endl;
         isValid = false;
     }
 
-    int missingNodeRefs = 0;
-    int zeroLengthEdges = 0;
-    int longEdgeWarnings = 0;
-    int invalidGeometries = 0;
-    int orphanEdges = 0;
-
     for (const auto& edge : edgesList_) {
-        bool fromExists = nodesMap_.find(edge.fromNodeId) != nodesMap_.end();
-        bool toExists = nodesMap_.find(edge.toNodeId) != nodesMap_.end();
+        bool fromExists = (nodesMap_.find(edge.fromNodeId) != nodesMap_.end());
+        bool toExists = (nodesMap_.find(edge.toNodeId) != nodesMap_.end());
 
         if (!fromExists) {
-            std::cout << "❌ Validation Error: Edge '" << edge.id << "' references missing fromNodeId '" << edge.fromNodeId << "'" << std::endl;
-            missingNodeRefs++;
+            cout << "Error: Edge '" << edge.id << "' references missing fromNodeId '" << edge.fromNodeId << "'" << endl;
             isValid = false;
         }
 
         if (!toExists) {
-            std::cout << "❌ Validation Error: Edge '" << edge.id << "' references missing toNodeId '" << edge.toNodeId << "'" << std::endl;
-            missingNodeRefs++;
+            cout << "Error: Edge '" << edge.id << "' references missing toNodeId '" << edge.toNodeId << "'" << endl;
             isValid = false;
-        }
-
-        if (!fromExists || !toExists) {
-            orphanEdges++;
         }
 
         if (edge.distance <= 0.0) {
-            std::cout << "❌ Validation Error: Edge '" << edge.id << "' (" << edge.fromNodeId << " -> " << edge.toNodeId << ") has zero or negative distance: " << edge.distance << "m" << std::endl;
-            zeroLengthEdges++;
+            cout << "Error: Edge '" << edge.id << "' has invalid distance: " << edge.distance << "m" << endl;
             isValid = false;
         }
-
-        if (edge.distance > 50.0) {
-            std::cout << "⚠️  Validation Warning: Edge '" << edge.id << "' (" << edge.fromNodeId << " -> " << edge.toNodeId << ") exceeds 50 meters (distance: " << std::fixed << std::setprecision(1) << edge.distance << "m). Consider adding intermediate waypoints/nodes for geometry precision." << std::endl;
-            longEdgeWarnings++;
-        }
-
-        if (edge.geometry.size() < 2) {
-            std::cout << "⚠️  Validation Warning: Edge '" << edge.id << "' has invalid geometry (<2 points)." << std::endl;
-            invalidGeometries++;
-        }
     }
-
-    if (isValid && validationErrors_.empty()) {
-        std::cout << "✅ Graph Dataset Validation Passed Successfully (0 Errors)." << std::endl;
-    } else {
-        std::cout << "⚠️  Graph Dataset Validation Completed with Errors." << std::endl;
-    }
-    std::cout << "--------------------------------------------------\n" << std::endl;
 
     return isValid;
 }
@@ -177,18 +142,18 @@ bool Graph::validateGraph() const {
 int Graph::countConnectedComponents() const {
     if (nodesMap_.empty()) return 0;
 
-    std::unordered_set<std::string> visited;
+    unordered_set<string> visited;
     int components = 0;
 
     for (const auto& [nodeId, node] : nodesMap_) {
         if (visited.find(nodeId) == visited.end()) {
             components++;
-            std::queue<std::string> q;
+            queue<string> q;
             q.push(nodeId);
             visited.insert(nodeId);
 
             while (!q.empty()) {
-                std::string curr = q.front();
+                string curr = q.front();
                 q.pop();
 
                 auto it = adjList_.find(curr);
@@ -228,44 +193,29 @@ void Graph::printStatistics() const {
 
     int components = countConnectedComponents();
 
-    int totalDegrees = 0;
-    for (const auto& [nodeId, neighbors] : adjList_) {
-        totalDegrees += static_cast<int>(neighbors.size());
-    }
-
-    double avgDegree = totalNodes > 0 ? static_cast<double>(totalDegrees) / totalNodes : 0.0;
-
-    std::cout << "==================================================" << std::endl;
-    std::cout << "            GRAPH ENGINE DATASET STATISTICS       " << std::endl;
-    std::cout << "==================================================" << std::endl;
-    std::cout << " Nodes               : " << totalNodes << std::endl;
-    std::cout << " Edges               : " << totalEdges << std::endl;
-    std::cout << " Hidden Nodes        : " << hiddenNodes << std::endl;
-    std::cout << " Bidirectional Edges : " << bidirectionalEdges << std::endl;
-    std::cout << " One-way Edges       : " << oneWayEdges << std::endl;
-    std::cout << " Connected Components: " << components << std::endl;
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << " Average Degree      : " << avgDegree << std::endl;
-    std::cout << "==================================================\n" << std::endl;
+    cout << "--- Graph Statistics ---" << endl;
+    cout << "Nodes: " << totalNodes << " (" << hiddenNodes << " hidden)" << endl;
+    cout << "Edges: " << totalEdges << " (" << bidirectionalEdges << " bidirectional, " << oneWayEdges << " one-way)" << endl;
+    cout << "Connected Components: " << components << endl;
 }
 
-std::optional<Node> Graph::findNodeById(const std::string& id) const {
+optional<Node> Graph::findNodeById(const string& id) const {
     auto it = nodesMap_.find(id);
     if (it != nodesMap_.end()) {
         return it->second;
     }
-    return std::nullopt;
+    return nullopt;
 }
 
-std::vector<Node> Graph::findNodesByName(const std::string& nameQuery) const {
-    std::vector<Node> results;
-    std::string queryLower = toLower(nameQuery);
+vector<Node> Graph::findNodesByName(const string& nameQuery) const {
+    vector<Node> results;
+    string queryLower = toLower(nameQuery);
 
     for (const auto& [id, node] : nodesMap_) {
-        if (node.isHidden) continue; // Ignore hidden navigation nodes in search
+        if (node.isHidden) continue;
 
-        std::string nodeNameLower = toLower(node.name);
-        if (nodeNameLower.find(queryLower) != std::string::npos) {
+        string nodeNameLower = toLower(node.name);
+        if (nodeNameLower.find(queryLower) != string::npos) {
             results.push_back(node);
         }
     }
